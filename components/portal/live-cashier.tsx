@@ -1,7 +1,7 @@
 "use client";
 
 import { MarkDepositedModal } from "./bank-deposits";
-import { depositedOn, drawerExpected, type BankDeposit } from "@/lib/bank-deposits";
+import { depositedOn, drawerExpected, fromLabel, type BankDeposit } from "@/lib/bank-deposits";
 import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
@@ -621,7 +621,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
             <button type="button" role="tab" aria-selected={outShown === "requests"} className={outShown === "requests" ? "on" : ""} onClick={() => setOutTab("requests")}>Requests<b>{asks.length}</b></button>
             <button type="button" role="tab" aria-selected={outShown === "deposits"} className={outShown === "deposits" ? "on" : ""} onClick={() => setOutTab("deposits")}>Deposits<b>{toDeposit.length}</b><em>{pesos(toDeposit.reduce((s, d) => s + Number(d.amount_centavos), 0))}</em></button>
           </div>
-          {outShown === "deposits" && (toDeposit.length ? <div className="wr-list">{toDeposit.map((d) => <WorkRow key={d.id} who={<span className="cx-name">{d.deposit_no} · {d.account}</span>} meta={d.status === "Returned" ? `Returned: ${d.reason ?? ""}` : `Deposit by ${d.due_on ? fmtDate(d.due_on) : "today"}${d.note ? ` · ${d.note}` : ""}`}
+          {outShown === "deposits" && (toDeposit.length ? <div className="wr-list">{toDeposit.map((d) => <WorkRow key={d.id} who={<span className="cx-name">{d.deposit_no} · {fromLabel(d.source)}{d.cheque_no ? ` (Cheque ${d.cheque_no})` : ""} → {d.account}</span>} meta={d.status === "Returned" ? `Returned: ${d.reason ?? ""}` : `Deposit by ${d.due_on ? fmtDate(d.due_on) : "today"}${d.note ? ` · ${d.note}` : ""}`}
             mid={<Badge tone={d.status === "Returned" ? "cancelled" : "orange"}>{d.status === "Returned" ? "Returned" : "To Deposit"}</Badge>} amount={pesos2(Number(d.amount_centavos))} acts={<button type="button" className="portal-primary row-act" onClick={() => setMarking(d)}>Mark Deposited</button>} />)}</div> : <p className="portal-empty-copy">No deposits requested by Accounting.</p>)}
           {outShown === "release" && (toRelease.length ? <div className="wr-list">{releaseP.shown.map((r) => <WorkRow key={r.id} who={<span className="cx-name">{r.what}</span>} meta={r.ref} amount={pesos2(r.amount)} acts={go ? <button type="button" className="portal-primary row-act" onClick={() => go("Expenses")}>Release</button> : null} />)}{releaseP.pager}</div> : <p className="portal-empty-copy">Nothing approved to release.</p>)}
           {outShown === "requests" && <>

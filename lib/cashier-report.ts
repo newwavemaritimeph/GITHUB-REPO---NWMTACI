@@ -53,7 +53,7 @@ export function cashPosition(input: { previousCentavos: number; cashCollectedCen
 
 /** Drawer cash deposited to the bank on a day; 0 before migration 202611110097. */
 async function depositsOn(db: Admin, date: string) {
-  const { data, error } = await db.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", date);
+  const { data, error } = await db.from("bank_deposits").select("status,deposited_on,amount_centavos,source").eq("deposited_on", date);
   return error ? 0 : depositedOn((data ?? []) as Parameters<typeof depositedOn>[0], date);
 }
 

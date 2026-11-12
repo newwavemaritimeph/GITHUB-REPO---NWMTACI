@@ -7,7 +7,11 @@ export type DepositAction = "cancel" | "mark" | "confirm" | "return";
 export type BankDeposit = {
   id: string; deposit_no: string; amount_centavos: number; account: string; due_on: string | null; note: string | null; status: DepositStatus;
   requested_at: string; deposited_at: string | null; deposited_on: string | null; reference: string | null; slip_link: string | null; confirmed_at: string | null; reason: string | null;
+  /** Where the money comes from (12 Nov 2026): "Cash" (the drawer), "GCash", a bank channel, or "Cheques Received". */
+  source?: string | null; cheque_no?: string | null;
 };
+export const CHEQUES = "Cheques Received";
+export const fromLabel = (source?: string | null) => (!source || source === "Cash" ? "Cash on Hand" : source);
 
 /** Which status each action moves a deposit to, from where; null when the action is not allowed. */
 const MOVES: Record<DepositAction, [DepositStatus[], DepositStatus]> = {
@@ -24,9 +28,9 @@ export function nextStatus(from: DepositStatus, action: DepositAction): DepositS
 /** Once deposited the cash has left the drawer, also while Accounting has it Returned for a correction. */
 export const leftDrawer = (s: DepositStatus) => s === "Deposited" || s === "Received" || s === "Returned";
 
-/** Cash deposited from the drawer on a day (YYYY-MM-DD, Manila). */
-export const depositedOn = (deps: Pick<BankDeposit, "status" | "deposited_on" | "amount_centavos">[], day: string) =>
-  deps.filter((d) => leftDrawer(d.status) && d.deposited_on === day).reduce((s, d) => s + Number(d.amount_centavos), 0);
+/** Money deposited from one source on a day (YYYY-MM-DD, Manila): "Cash" is the drawer, "GCash" the GCash balance. */
+export const depositedOn = (deps: Pick<BankDeposit, "status" | "deposited_on" | "amount_centavos" | "source">[], day: string, source = "Cash") =>
+  deps.filter((d) => leftDrawer(d.status) && d.deposited_on === day && (d.source || "Cash") === source).reduce((s, d) => s + Number(d.amount_centavos), 0);
 
 /** Opening + cash collected − cash expenses − bank deposits = expected in the drawer. */
 export const drawerExpected = (x: { opening: number; cashIn: number; cashExpenses: number; deposits: number }) => x.opening + x.cashIn - x.cashExpenses - x.deposits;

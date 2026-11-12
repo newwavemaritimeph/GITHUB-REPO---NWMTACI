@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fileInDrive } from "@/lib/google-drive";
-import { depositNumber, depositedOn, drawerExpected, nextStatus, type BankDeposit, type DepositAction, type DepositStatus } from "@/lib/bank-deposits";
+import { CHEQUES, depositNumber, depositedOn, drawerExpected, nextStatus, type BankDeposit, type DepositAction, type DepositStatus } from "@/lib/bank-deposits";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
  */
 const day = z.string().date();
 const input = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("request"), amountCentavos: z.number().int().positive().max(100_000_000_00), account: z.string().trim().min(2).max(80), dueOn: day.optional().nullable(), note: z.string().trim().max(300).optional().default("") }),
+  z.object({ action: z.literal("request"), amountCentavos: z.number().int().positive().max(100_000_000_00), account: z.string().trim().min(2).max(80), source: z.string().trim().min(2).max(80).default("Cash"), chequeNo: z.string().trim().max(40).optional().default(""), dueOn: day.optional().nullable(), note: z.string().trim().max(300).optional().default("") }),
   z.object({ action: z.literal("cancel"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) }),
   z.object({ action: z.literal("confirm"), id: z.string().uuid() }),
   z.object({ action: z.literal("return"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) }),
@@ -35,7 +35,7 @@ async function drawerToday(db: Db, date: string) {
     db.from("payments").select("amount_centavos").eq("valid", true).eq("method", "Cash").gte("received_at", start).lte("received_at", end),
     db.from("other_income").select("amount_centavos,channel").is("voided_at", null).eq("received_on", date),
     db.from("expenses").select("amount_centavos,payment_channel").eq("status", "Paid").gte("paid_at", start).lte("paid_at", end),
-    db.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", date),
+    db.from("bank_deposits").select("status,deposited_on,amount_centavos,source").eq("deposited_on", date),
   ]);
   const sum = (rows: { amount_centavos: number }[] | null | undefined) => (rows ?? []).reduce((s, r) => s + Number(r.amount_centavos), 0);
   return drawerExpected({
@@ -53,8 +53,8 @@ export async function POST(request: Request) {
   const role = staff.roleCodes.includes("admin") ? "admin" : staff.roleCodes.includes("accounting") ? "accounting" : "cashier";
   const audit = (action: string, id: string, prior: unknown, next: unknown, reason?: string) =>
     db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action, record_type: "bank_deposit", record_id: id, prior_values: prior ?? null, new_values: next ?? null, reason: reason || null });
-  const fail = (e: { message: string }) => NextResponse.json({ error: /bank_deposits/.test(e.message) ? "Apply database update 202611110097 first." : e.message }, { status: 400 });
-  const load = async (id: string) => (await db.from("bank_deposits").select("id,deposit_no,amount_centavos,account,status,reference").eq("id", id).maybeSingle()).data as (Pick<BankDeposit, "id" | "deposit_no" | "amount_centavos" | "account" | "reference"> & { status: DepositStatus }) | null;
+  const fail = (e: { message: string }) => NextResponse.json({ error: /cheque_no|source/.test(e.message) ? "Apply database update 202611120100 first." : /bank_deposits/.test(e.message) ? "Apply database update 202611110097 first." : e.message }, { status: 400 });
+  const load = async (id: string) => (await db.from("bank_deposits").select("id,deposit_no,amount_centavos,account,status,reference,source").eq("id", id).maybeSingle()).data as (Pick<BankDeposit, "id" | "deposit_no" | "amount_centavos" | "account" | "reference" | "source"> & { status: DepositStatus }) | null;
   const move = async (id: string, act: DepositAction, patch: Record<string, unknown>, reason?: string) => {
     const d = await load(id);
     if (!d) return NextResponse.json({ error: "Deposit not found." }, { status: 404 });
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const d = await load(id.data);
     if (!d) return NextResponse.json({ error: "Deposit not found." }, { status: 404 });
     // A first deposit leaves the drawer today; a corrected one (Returned) already did.
-    if (d.status === "Requested" && on.data === manilaDay()) {
+    if (d.status === "Requested" && on.data === manilaDay() && (d.source || "Cash") === "Cash") {
       const inDrawer = await drawerToday(db, on.data);
       if (d.amount_centavos > inDrawer) return NextResponse.json({ error: `This is more than the cash expected in the drawer (₱${(inDrawer / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}).` }, { status: 400 });
     }
@@ -104,10 +104,12 @@ export async function POST(request: Request) {
   if (!staff.roleCodes.some((r) => ["accounting", "admin"].includes(r))) return NextResponse.json({ error: "Only Accounting or the Admin can do this." }, { status: 403 });
 
   if (body.action === "request") {
+    if (body.source === body.account) return NextResponse.json({ error: "From and To cannot be the same account." }, { status: 400 });
+    if (body.source === CHEQUES && body.chequeNo.length < 3) return NextResponse.json({ error: "Enter the cheque number." }, { status: 400 });
     const { data: ref, error: refErr } = await db.rpc("next_reference", { prefix: "DEP" });
     if (refErr) return fail(refErr);
     const depositNo = depositNumber(String(ref));
-    const row = { deposit_no: depositNo, amount_centavos: body.amountCentavos, account: body.account, due_on: body.dueOn ?? null, note: body.note || null, requested_by: staff.user.id };
+    const row = { deposit_no: depositNo, amount_centavos: body.amountCentavos, account: body.account, source: body.source, cheque_no: body.source === CHEQUES ? body.chequeNo : null, due_on: body.dueOn ?? null, note: body.note || null, requested_by: staff.user.id };
     const { data, error } = await db.from("bank_deposits").insert(row).select("id").single();
     if (error) return fail(error);
     await audit("bank_deposit.request", data.id, null, row);

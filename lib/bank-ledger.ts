@@ -15,7 +15,7 @@ export type BankEntry = {
   cheque_no: string | null; cheque_status: "Issued" | "Encashed" | "Void" | null; cleared_on: string | null; expense_id: string | null; reversal_of: string | null; reason: string | null;
 };
 export type AutoPayment = { id: string; on: string; amount: number; method: string; reference: string; who: string };
-export type AutoDeposit = { id: string; on: string; amount: number; account: string; reference: string };
+export type AutoDeposit = { id: string; on: string; amount: number; account: string; reference: string; source?: string };
 export type AutoExpense = { id: string; on: string; amount: number; channel: string; reference: string; who: string };
 
 export type LedgerRow = {
@@ -36,7 +36,9 @@ export function buildLedger(a: BankAccount, src: { payments: AutoPayment[]; depo
   const after = (on: string) => on >= a.opening_on;
   const rows: Omit<LedgerRow, "balance">[] = [
     ...src.payments.filter((p) => p.method === a.channel && after(p.on)).map((p) => ({ key: `p${p.id}`, on: p.on, source: "Payment" as const, type: "Payment", description: p.who, reference: p.reference, amount: p.amount, counted: true })),
-    ...src.deposits.filter((d) => d.account === a.channel && after(d.on)).map((d) => ({ key: `d${d.id}`, on: d.on, source: "Deposit" as const, type: "Bank Deposit", description: "Cash from the drawer", reference: d.reference, amount: d.amount, counted: true })),
+    ...src.deposits.filter((d) => d.account === a.channel && after(d.on)).map((d) => ({ key: `d${d.id}`, on: d.on, source: "Deposit" as const, type: "Bank Deposit", description: `From ${!d.source || d.source === "Cash" ? "Cash on Hand" : d.source}`, reference: d.reference, amount: d.amount, counted: true })),
+    // A deposit from this bank to another one leaves this account.
+    ...src.deposits.filter((d) => d.source === a.channel && d.account !== a.channel && after(d.on)).map((d) => ({ key: `o${d.id}`, on: d.on, source: "Deposit" as const, type: "Bank Deposit", description: `To ${d.account}`, reference: d.reference, amount: -d.amount, counted: true })),
     ...src.expenses.filter((x) => x.channel === a.channel && after(x.on) && !chequePaid.has(x.id)).map((x) => ({ key: `x${x.id}`, on: x.on, source: "Expense" as const, type: "Expense", description: x.who, reference: x.reference, amount: -Math.abs(x.amount), counted: true })),
     ...mine.filter((e) => after(e.entry_on)).map((e) => ({
       key: `e${e.id}`, on: e.entry_on, source: "Encoded" as const, type: e.entry_type, entry: e,

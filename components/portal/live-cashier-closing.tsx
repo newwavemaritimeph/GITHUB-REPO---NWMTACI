@@ -50,7 +50,7 @@ export function LiveCashierClosing({ data, reload, canAct = true }: { data: Clos
       cashIn: sum(pays.filter((p) => isCash(p.method))) + sum(inc.filter((i) => isCash(i.channel))),
       gcashIn: sum(pays.filter((p) => isGcash(p.method))) + sum(inc.filter((i) => isGcash(i.channel))),
       cashExpenses: sum(exps.filter((x) => isCash(x.payment_channel))), gcashExpenses: sum(exps.filter((x) => isGcash(x.payment_channel))),
-      deposits: depositedOn(data.bankDeposits ?? [], d),
+      deposits: depositedOn(data.bankDeposits ?? [], d), gcashDeposits: depositedOn(data.bankDeposits ?? [], d, "GCash"),
     };
   })();
   const counted = countedCentavos(Object.fromEntries(Object.entries(counts).map(([k, v]) => [Number(k), Number(v)])));
@@ -102,7 +102,7 @@ export function LiveCashierClosing({ data, reload, canAct = true }: { data: Clos
       <div className="hr-kpis"><div className="hr-kpi"><b>{peso(check.cash)}</b><small>Expected Cash</small></div><div className="hr-kpi"><b>{peso(check.gcash)}</b><small>Expected GCash</small></div><div className="hr-kpi"><b>{peso(check.cash + check.gcash)}</b><small>Cash + GCash</small></div></div>
       <div className="oc-two">
         {side("Cash", "cash", lines([["Opening Cash", f.openingCash], [`+ Cash Collected · ${receipts(isCash)} Receipts`, f.cashIn, "plus"], ["− Cash Expenses", f.cashExpenses, "minus"], ["− Bank Deposits", f.deposits, "minus"], ["= Expected in Drawer", check.cash, "total"]]))}
-        {side("GCash", "gcash", lines([["Opening GCash Balance", f.openingGcash], [`+ GCash Collected · ${receipts(isGcash)} Receipts`, f.gcashIn, "plus"], ["− GCash Expenses", f.gcashExpenses, "minus"], ["= Expected GCash Balance", check.gcash, "total"]]))}
+        {side("GCash", "gcash", lines([["Opening GCash Balance", f.openingGcash], [`+ GCash Collected · ${receipts(isGcash)} Receipts`, f.gcashIn, "plus"], ["− GCash Expenses", f.gcashExpenses, "minus"], ["− Deposited to Bank", f.gcashDeposits ?? 0, "minus"], ["= Expected GCash Balance", check.gcash, "total"]]))}
       </div>
       {canAct && !closed && <div className="portal-form-actions"><button type="button" className="portal-primary" onClick={() => setStep("Closing")}>Start Closing</button></div>}
     </>}

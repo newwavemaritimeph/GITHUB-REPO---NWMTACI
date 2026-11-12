@@ -41,4 +41,11 @@ describe("bank ledger", () => {
   });
 
   it("numbers entries NWM-BNK-YYYY-NNNN", () => expect(entryNumber("BNK-2026-000012")).toBe("NWM-BNK-2026-0012"));
+  it("moves a bank-to-bank deposit out of the source bank and into the target", () => {
+    const ub: BankAccount = { ...psb, id: "b", bank: "UnionBank", channel: "UnionBank", opening_balance_centavos: 0 };
+    const src = { payments: [], expenses: [], entries: [], deposits: [{ id: "d9", on: "2026-11-12", amount: 500_000, account: "UnionBank", reference: "NWM-DEP-2026-0009", source: "PSBank" }] };
+    expect(buildLedger(psb, src).book).toBe(15_000_000 - 500_000);
+    expect(buildLedger(ub, src).book).toBe(500_000);
+    expect(buildLedger(ub, src).rows[0].description).toBe("From PSBank");
+  });
 });

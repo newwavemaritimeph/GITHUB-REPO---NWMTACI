@@ -1298,7 +1298,7 @@ export async function GET(request: Request) {
   // Bank deposits (migration 202611110097; empty without it): Cashier, Accounting and Admin.
   let bankDeposits: unknown[] = [];
   if (canCashier(staff.roleCodes)) task(async () => {
-    const { data: depRows, error: depErr } = await createSupabaseAdminClient().from("bank_deposits").select("id,deposit_no,amount_centavos,account,due_on,note,status,requested_at,deposited_at,deposited_on,reference,slip_link,confirmed_at,reason").order("requested_at", { ascending: false }).limit(200);
+    const { data: depRows, error: depErr } = await createSupabaseAdminClient().from("bank_deposits").select("id,deposit_no,amount_centavos,account,source,cheque_no,due_on,note,status,requested_at,deposited_at,deposited_on,reference,slip_link,confirmed_at,reason").order("requested_at", { ascending: false }).limit(200);
     bankDeposits = depErr ? [] : depRows ?? [];
   });
   // When each enrollment became Enrolled (migration 202610070014; empty without it).
@@ -2089,7 +2089,7 @@ export async function POST(request: Request) {
       const { data: dayIncome } = await admin.from("other_income").select("amount_centavos,channel").is("voided_at", null).eq("received_on", input.closingDate);
       const incomeCash = (dayIncome ?? []).filter((i) => i.channel === "Cash").reduce((s, i) => s + Number(i.amount_centavos), 0);
       // Bank deposits (202611110097) leave the drawer; not expenses. 0 before the migration.
-      const { data: dayDeps, error: depErr } = await admin.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", input.closingDate);
+      const { data: dayDeps, error: depErr } = await admin.from("bank_deposits").select("status,deposited_on,amount_centavos,source").eq("deposited_on", input.closingDate);
       const deposits = depErr ? 0 : depositedOn((dayDeps ?? []) as Parameters<typeof depositedOn>[0], input.closingDate);
       const expected = input.openingCashCentavos + cash + incomeCash - expensesTotal - refunds - deposits;
       const variance = input.actualCashCentavos - expected;

@@ -23,7 +23,7 @@ async function dayFigures(db: Db, date: string, opening: { cash: number; gcash: 
     db.from("payments").select("amount_centavos,method").eq("valid", true).gte("received_at", start).lte("received_at", end),
     db.from("other_income").select("amount_centavos,channel").is("voided_at", null).eq("received_on", date),
     db.from("expenses").select("amount_centavos,payment_channel").eq("status", "Paid").gte("paid_at", start).lte("paid_at", end),
-    db.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", date),
+    db.from("bank_deposits").select("status,deposited_on,amount_centavos,source").eq("deposited_on", date),
   ]);
   const p = pays.data ?? [], i = inc.error ? [] : inc.data ?? [], x = exps.data ?? [];
   return {
@@ -33,6 +33,7 @@ async function dayFigures(db: Db, date: string, opening: { cash: number; gcash: 
     cashExpenses: sum(x.filter((r) => isCash(r.payment_channel))),
     gcashExpenses: sum(x.filter((r) => isGcash(r.payment_channel))),
     deposits: deps.error ? 0 : depositedOn((deps.data ?? []) as Parameters<typeof depositedOn>[0], date),
+    gcashDeposits: deps.error ? 0 : depositedOn((deps.data ?? []) as Parameters<typeof depositedOn>[0], date, "GCash"),
     online: sum(p.filter((r) => !isCash(r.method))),
   };
 }

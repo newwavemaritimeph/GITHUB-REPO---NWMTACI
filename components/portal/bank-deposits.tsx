@@ -4,7 +4,7 @@ import { useState } from "react";
 import { askText, askConfirm } from "./dialogs";
 import { Badge, Message, Modal } from "./shared-ui";
 import { HrFormModal, toCentavos } from "./hr-forms";
-import type { BankDeposit, DepositStatus } from "@/lib/bank-deposits";
+import { CHEQUES, fromLabel, type BankDeposit, type DepositStatus } from "@/lib/bank-deposits";
 
 /** Bank Deposits (owner, 11 Nov 2026): Accounting requests drawer cash be deposited, then confirms it. Never an expense. */
 type Data = { bankDeposits?: BankDeposit[]; paymentMethods: { name: string; active: boolean }[] };
@@ -26,6 +26,8 @@ export function BankDeposits({ data, reload }: { data: Data; reload: () => Promi
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const deps = data.bankDeposits ?? [];
   const accounts = data.paymentMethods.filter((m) => m.active && !/^cash$/i.test(m.name)).map((m) => m.name);
+  // From (owner, 12 Nov 2026): the drawer, GCash, another bank channel, or customer cheques.
+  const sources: [string, string][] = [["Cash", "Cash on Hand"], ...accounts.filter((a) => !/^cheque/i.test(a)).map((a): [string, string] => [a, a]), [CHEQUES, CHEQUES]];
   const rows = deps.filter((d) => show === "All" || (show === "Open" ? ["Requested", "Deposited", "Returned"].includes(d.status) : d.status === show));
   const act = async (key: string, body: Record<string, unknown>, ok: string) => { setBusy(key); setMsg(null); try { await depositPost(body); await reload(); setMsg({ kind: "success", text: ok }); } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not save." }); } finally { setBusy(""); } };
   return <div className="portal-page hr-page">
@@ -33,31 +35,34 @@ export function BankDeposits({ data, reload }: { data: Data; reload: () => Promi
       <div className="hr-head-acts"><select className="hr-show" value={show} onChange={(e) => setShow(e.target.value)} aria-label="Show">{["Open", "Received", "Cancelled", "All"].map((o) => <option key={o}>{o}</option>)}</select>
         <button type="button" className="portal-primary" onClick={() => setForm(true)}>Request Deposit</button></div></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <section className="portal-panel hr-table"><div className="portal-table-wrap"><table className="portal-table cx-cards"><thead><tr><th>Deposit</th><th>To Account</th><th className="num">Amount</th><th>Status</th><th /></tr></thead><tbody>
+    <section className="portal-panel hr-table"><div className="portal-table-wrap"><table className="portal-table cx-cards"><thead><tr><th>Deposit</th><th>From → To</th><th className="num">Amount</th><th>Status</th><th /></tr></thead><tbody>
       {rows.map((d) => <tr key={d.id}>
         <td className="lead" data-l="Deposit"><strong>{d.deposit_no}</strong><small>{d.status === "Requested" ? `Due ${shortDate(d.due_on)}` : d.deposited_on ? `Deposited ${shortDate(d.deposited_on)}${d.reference ? ` · Ref ${d.reference}` : ""}` : `Requested ${shortDate(d.requested_at)}`}{d.note ? ` · ${d.note}` : ""}{d.reason ? ` · ${d.reason}` : ""}</small></td>
-        <td data-l="Account">{d.account}</td>
+        <td data-l="From → To"><strong>{fromLabel(d.source)}</strong>{d.cheque_no ? ` (Cheque ${d.cheque_no})` : ""} → {d.account}</td>
         <td data-l="Amount" className="num"><b>{peso2(d.amount_centavos)}</b></td>
         <td data-l="Status"><Badge tone={DEP_TONE[d.status]}>{depLabel(d.status)}</Badge></td>
         <td data-l="" className="hr-cell-acts"><span className="hr-acts">
           {d.slip_link && <a className="portal-secondary row-act" href={d.slip_link} target="_blank" rel="noreferrer">Slip</a>}
-          {d.status === "Requested" && <button type="button" className="portal-secondary danger row-act" disabled={!!busy} onClick={async () => { const reason = await askText("It stays on record as Cancelled.", "", { title: "Cancel This Deposit?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${d.account}`], label: "Reason", okLabel: "Cancel Deposit", danger: true }); if (reason) await act(`c${d.id}`, { action: "cancel", id: d.id, reason }, `${d.deposit_no} cancelled.`); }}>Cancel</button>}
-          {d.status === "Deposited" && <><button type="button" className="portal-secondary row-act" disabled={!!busy} onClick={async () => { const reason = await askText("The Cashier sees this and marks it deposited again.", "", { title: "Return to the Cashier?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${d.account}`], label: "What to Fix", required: true, okLabel: "Return Deposit" }); if (reason) await act(`r${d.id}`, { action: "return", id: d.id, reason }, `${d.deposit_no} returned to the Cashier.`); }}>Return</button>
-            <button type="button" className="portal-primary row-act" disabled={!!busy} onClick={async () => { if (await askConfirm("Check the amount on the bank statement first.", { title: "Confirm Deposit Received?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${d.account}`], okLabel: "Confirm Received" })) await act(`k${d.id}`, { action: "confirm", id: d.id }, `${d.deposit_no} confirmed received.`); }}>Confirm Received</button></>}
+          {d.status === "Requested" && <button type="button" className="portal-secondary danger row-act" disabled={!!busy} onClick={async () => { const reason = await askText("It stays on record as Cancelled.", "", { title: "Cancel This Deposit?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${fromLabel(d.source)} → ${d.account}`], label: "Reason", okLabel: "Cancel Deposit", danger: true }); if (reason) await act(`c${d.id}`, { action: "cancel", id: d.id, reason }, `${d.deposit_no} cancelled.`); }}>Cancel</button>}
+          {d.status === "Deposited" && <><button type="button" className="portal-secondary row-act" disabled={!!busy} onClick={async () => { const reason = await askText("The Cashier sees this and marks it deposited again.", "", { title: "Return to the Cashier?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${fromLabel(d.source)} → ${d.account}`], label: "What to Fix", required: true, okLabel: "Return Deposit" }); if (reason) await act(`r${d.id}`, { action: "return", id: d.id, reason }, `${d.deposit_no} returned to the Cashier.`); }}>Return</button>
+            <button type="button" className="portal-primary row-act" disabled={!!busy} onClick={async () => { if (await askConfirm("Check the amount on the bank statement first.", { title: "Confirm Deposit Received?", eyebrow: "Bank Deposits", record: [d.deposit_no, `${peso2(d.amount_centavos)} · ${fromLabel(d.source)} → ${d.account}`], okLabel: "Confirm Received" })) await act(`k${d.id}`, { action: "confirm", id: d.id }, `${d.deposit_no} confirmed received.`); }}>Confirm Received</button></>}
         </span></td>
       </tr>)}
       {!rows.length && <tr><td colSpan={5} className="hr-none">No deposits in this list. Use Request Deposit to ask the Cashier to deposit cash.</td></tr>}
     </tbody></table></div></section>
     {form && <HrFormModal title="Request Deposit" submitLabel="Request Deposit" onClose={() => setForm(false)}
-      initial={{ account: accounts[0] ?? "", dueOn: today() }}
+      initial={{ source: "Cash", account: accounts.filter((a) => !/^g-?cash$|^cheque/i.test(a))[0] ?? accounts[0] ?? "", dueOn: today() }}
       fields={[
         { key: "amount", label: "Amount (PHP)", type: "number", required: true, min: "1", step: "0.01" },
         { key: "dueOn", label: "Deposit By", type: "date", min: today() },
-        { key: "account", label: "To Account", type: "select", required: true, options: accounts, full: true },
+        { key: "source", label: "From", type: "select", required: true, options: sources },
+        { key: "account", label: "To Account", type: "select", required: true, options: accounts.filter((a) => !/^cheque/i.test(a)) },
+        { key: "chequeNo", label: "Cheque No.", required: true, full: true, placeholder: "e.g. 0045821 · drawer bank", show: (v) => v.source === CHEQUES },
         { key: "note", label: "Note", full: true, placeholder: "e.g. Excess cash from yesterday's collections" },
       ]}
-      note="A deposit moves cash from the drawer to the bank. It is never recorded as an expense."
-      onSubmit={async (v) => { const r = await depositPost({ action: "request", amountCentavos: toCentavos(v.amount), account: v.account, dueOn: v.dueOn || null, note: v.note }); await reload(); setMsg({ kind: "success", text: `${r.depositNo} requested. The Cashier sees it in Money Out › Deposits.` }); }} />}
+      note="From Cash on Hand lowers the drawer; From GCash lowers the GCash balance; from another bank it moves between banks; cheques go straight to the bank. A deposit is never an expense."
+      onSubmit={async (v) => { if (v.source === v.account) throw new Error("From and To cannot be the same account.");
+        const r = await depositPost({ action: "request", amountCentavos: toCentavos(v.amount), account: v.account, source: v.source, chequeNo: v.chequeNo, dueOn: v.dueOn || null, note: v.note }); await reload(); setMsg({ kind: "success", text: `${r.depositNo} requested. The Cashier sees it in Money Out › Deposits.` }); }} />}
   </div>;
 }
 
@@ -74,7 +79,7 @@ export function MarkDepositedModal({ deposit, onClose, onDone }: { deposit: Bank
       {err && <p className="hr-form-err full" role="alert">{err}</p>}
       {deposit.reason && <p className="hr-form-note full">Returned by Accounting: {deposit.reason}</p>}
       <label>Amount<input value={peso2(deposit.amount_centavos)} readOnly /></label>
-      <label>To Account<input value={deposit.account} readOnly /></label>
+      <label>From → To<input value={`${fromLabel(deposit.source)}${deposit.cheque_no ? ` (Cheque ${deposit.cheque_no})` : ""} → ${deposit.account}`} readOnly /></label>
       <label>Deposit Date<input type="date" required max={today()} value={on} onChange={(e) => setOn(e.target.value)} /></label>
       <label>Bank Reference No.<input required minLength={3} value={ref} onChange={(e) => setRef(e.target.value)} placeholder="From the deposit slip" /></label>
       <label className="full">Deposit Slip (Photo or PDF)<input type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => setSlip(e.target.files?.[0] ?? null)} /></label>

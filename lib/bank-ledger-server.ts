@@ -20,7 +20,7 @@ export async function loadBankLedger(db: Admin) {
   const [ent, pay, dep, exp, link] = await Promise.all([
     db.from("bank_entries").select("id,entry_no,account_id,entry_type,entry_on,amount_centavos,payee,description,cheque_no,cheque_status,cleared_on,expense_id,reversal_of,reason").order("entry_on").limit(5000),
     db.from("payments").select("id,amount_centavos,method,received_at,receipts(receipt_number),trainees(legal_first_name,legal_last_name)").eq("valid", true).in("method", channels).gte("received_at", start).limit(10000),
-    db.from("bank_deposits").select("id,deposit_no,amount_centavos,account,status,deposited_on").in("account", channels).gte("deposited_on", from).limit(5000),
+    db.from("bank_deposits").select("id,deposit_no,amount_centavos,account,source,status,deposited_on").or(`account.in.(${channels.map((c) => `"${c}"`).join(",")}),source.in.(${channels.map((c) => `"${c}"`).join(",")})`).gte("deposited_on", from).limit(5000),
     db.from("expenses").select("id,expense_number,voucher_number,payee,amount_centavos,payment_channel,paid_at,status").eq("status", "Paid").in("payment_channel", channels).gte("paid_at", start).limit(5000),
     db.from("expenses").select("id,expense_number,voucher_number,payee,amount_centavos,status").in("status", ["Approved", "Paid"]).order("created_at", { ascending: false }).limit(150),
   ]);
@@ -28,7 +28,7 @@ export async function loadBankLedger(db: Admin) {
     const t = one(p.trainees as unknown as { legal_first_name?: string; legal_last_name?: string } | null), r = one(p.receipts as unknown as { receipt_number?: string } | null);
     return { id: p.id as string, on: manila(p.received_at as string), amount: Number(p.amount_centavos), method: p.method as string, reference: r?.receipt_number ?? "Payment", who: t ? `${(t.legal_last_name ?? "").toUpperCase()}, ${t.legal_first_name ?? ""}` : "Payment" };
   });
-  const deposits: AutoDeposit[] = (dep.data ?? []).filter((d) => d.deposited_on && leftDrawer(d.status as DepositStatus)).map((d) => ({ id: d.id as string, on: d.deposited_on as string, amount: Number(d.amount_centavos), account: d.account as string, reference: d.deposit_no as string }));
+  const deposits: AutoDeposit[] = (dep.data ?? []).filter((d) => d.deposited_on && leftDrawer(d.status as DepositStatus)).map((d) => ({ id: d.id as string, on: d.deposited_on as string, amount: Number(d.amount_centavos), account: d.account as string, reference: d.deposit_no as string, source: (d.source as string | null) ?? "Cash" }));
   const expenses: AutoExpense[] = (exp.data ?? []).map((x) => ({ id: x.id as string, on: manila(x.paid_at as string), amount: Number(x.amount_centavos), channel: x.payment_channel as string, reference: (x.voucher_number ?? x.expense_number) as string, who: x.payee as string }));
   const linkable = (link.data ?? []).map((x) => ({ id: x.id as string, label: `${x.voucher_number ?? x.expense_number} · ${x.payee} · ₱${(Number(x.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}` }));
   return { accounts, entries: (ent.data ?? []) as BankEntry[], payments, deposits, expenses, linkable };

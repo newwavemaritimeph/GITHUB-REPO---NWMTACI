@@ -25,4 +25,14 @@ describe("bank deposits", () => {
   it("numbers deposits NWM-DEP-YYYY-NNNN", () => {
     expect(depositNumber("DEP-2026-000007")).toBe("NWM-DEP-2026-0007");
   });
+  it("counts each source on its own side: drawer cash, GCash, banks", () => {
+    const deps = [
+      { status: "Deposited" as const, deposited_on: "2026-11-12", amount_centavos: 1_000_000, source: "Cash" },
+      { status: "Deposited" as const, deposited_on: "2026-11-12", amount_centavos: 500_000, source: "GCash" },
+      { status: "Received" as const, deposited_on: "2026-11-12", amount_centavos: 300_000, source: null },
+      { status: "Deposited" as const, deposited_on: "2026-11-12", amount_centavos: 900_000, source: "PSBank" },
+    ];
+    expect(depositedOn(deps, "2026-11-12")).toBe(1_300_000);
+    expect(depositedOn(deps, "2026-11-12", "GCash")).toBe(500_000);
+  });
 });

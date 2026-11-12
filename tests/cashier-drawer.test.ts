@@ -20,4 +20,8 @@ describe("opening and closing, Cash and GCash", () => {
     expect([isCash(null), isCash("Cash"), isCash("GCash")]).toEqual([true, true, false]);
     expect([isGcash("GCash"), isGcash("G-Cash"), isGcash("PSBank")]).toEqual([true, true, false]);
   });
+  it("takes GCash deposited to a bank off the GCash side only", () => {
+    const f = { openingCash: 0, cashIn: 0, cashExpenses: 0, deposits: 0, openingGcash: 1_000_000, gcashIn: 0, gcashExpenses: 0, gcashDeposits: 400_000 };
+    expect(closingCheck(f, 0, 600_000)).toMatchObject({ cash: 0, gcash: 600_000, gcashVariance: 0 });
+  });
 });
