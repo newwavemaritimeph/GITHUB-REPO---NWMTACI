@@ -15,11 +15,11 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
-import { askReason } from "./dialogs";
+import { askReason, askText } from "./dialogs";
 import { SPECIAL_URL, pendingSpecials, specialCourse, specialTrainee } from "./special-arrangements";
 import { CashierSummaryReport } from "./live-cashier";
 import type { SummaryRange } from "@/lib/summary-range";
-import { PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
+import { CheckGlyph, PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
 
 /**
  * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
@@ -265,6 +265,12 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
     const reason = await askReason(`Void ${receipt} (${channel}, ${pesos2(amount)})? It goes back to the trainee's balance and the receipt prints VOID. Nothing is erased.`, REASONS.paymentVoid, { title: "Void Payment", okLabel: "Void", danger: true });
     if (reason) await vp.post({ action: "payment-void", paymentId: id, reason }, `${receipt} voided.`);
   }
+  // Clear Duplicate (owner, 12 Nov 2026): one consultancy transfer for several trainees was flagged; the amount never changes.
+  async function clearDuplicate(id: string, receipt: string, amount: number, reference: string) {
+    const same = rows.filter((x) => x.reference && x.reference.toLowerCase() === reference.toLowerCase());
+    const note = await askText(`Reference ${reference || "—"} is on ${same.length} payment${same.length === 1 ? "" : "s"} today totalling ${pesos2(same.reduce((t, x) => t + x.amountCentavos, 0))}. Check the bank statement shows one transfer for them.`, "", { title: "Clear Duplicate Reference?", eyebrow: "Payments", record: [receipt, `${pesos2(amount)} · Ref ${reference || "—"}`], label: "Note (Consultancy and What You Checked)", required: true, okLabel: "Clear Duplicate" });
+    if (note && note.trim().length >= 5) await vp.post({ action: "payment-clear-duplicate", paymentId: id, note: note.trim() }, `${receipt} is Verified. The note is in the audit log.`);
+  }
   const sourceName = (kind: string, name: string) => (kind === "Direct walk-in" ? "Walk-in" : name || kind);
   const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: sourceName(g.kind, g.name) }))) : [];
   const term = q.trim().toLowerCase();
@@ -298,7 +304,7 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
             const s = paymentStatus(data, { id: x.paymentId ?? "", valid: x.valid, void_reason: x.voidReason, verification_state: x.verificationState }), isVoid = x.valid === false;
             return [
               !i && <PaymentDayRow key="day" day={fmtDate(date)} count={shown.length} span={5} total={pesos2(shown.filter((v) => v.valid !== false).reduce((n, v) => n + v.amountCentavos, 0))} />,
-              <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Void" aria-label={`Void ${x.receipt}`} disabled={vp.busy} onClick={() => void voidPayment(x.paymentId!, x.receipt, x.amountCentavos, x.channel)}><VoidGlyph /></button>}</td></tr>,
+              <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}{x.paymentId && !isVoid && x.verificationState === "Duplicate Review" && <button type="button" className="pv-icon" title="Clear Duplicate" aria-label={`Clear Duplicate ${x.receipt}`} disabled={vp.busy} onClick={() => void clearDuplicate(x.paymentId!, x.receipt, x.amountCentavos, x.reference ?? "")}><CheckGlyph /></button>}{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Void" aria-label={`Void ${x.receipt}`} disabled={vp.busy} onClick={() => void voidPayment(x.paymentId!, x.receipt, x.amountCentavos, x.channel)}><VoidGlyph /></button>}</td></tr>,
               x.paymentId ? <Fragment key={`${x.receipt}-${i}-reprint`}>{rp.formRow("receipt", x.paymentId, x.receipt, 7)}</Fragment> : null,
             ];
           })}

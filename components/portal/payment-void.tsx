@@ -43,6 +43,9 @@ export const PrintGlyph = () => <svg viewBox="0 0 24 24" fill="none" stroke="cur
 /** The crossed circle on a payment row's void icon. */
 export const VoidGlyph = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></svg>;
 
+/** The tick on a payment row's Clear Duplicate icon. */
+export const CheckGlyph = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>;
+
 /** The line above each day of a payment list (Payment Row 6 + 9): how many that day and their valid total, over the Amount column. */
 export const PaymentDayRow = ({ day, count, total, span }: { day: string; count: number; total: string; span: number }) => <tr className="pv-dayrow"><td data-l="" colSpan={span}>{day} · {count} Payment{count === 1 ? "" : "s"}</td><td data-l="" className="r cx-amt">{total}</td><td data-l="" /></tr>;
 

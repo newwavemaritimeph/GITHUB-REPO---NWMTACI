@@ -2,6 +2,7 @@
 
 import { MarkDepositedModal } from "./bank-deposits";
 import { SPECIAL_TONE, SpecialRequestForm, specialCourse, specialTrainee } from "./special-arrangements";
+import { consultancyOpen, groupProblem } from "@/lib/group-payment";
 import { depositedOn, drawerExpected, fromLabel, type BankDeposit } from "@/lib/bank-deposits";
 import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
@@ -347,6 +348,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(initialProof ? { id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false } : null);
   const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
+  // Paid By (owner, 12 Nov 2026, Option B): a consultancy paying several trainees with one transfer.
+  const [paidBy, setPaidBy] = useState<"Trainee" | "Consultancy">("Trainee");
+  const canGroup = !initial && !initialProof;
 
   // Company Charge courses are paid by the partner on its Billing Statement (Accounting records it, 5 Nov 2026), never here.
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]);
@@ -455,9 +459,12 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
     </div>
   </Modal>;
 
+  const paidBySwitch = canGroup && !group && <div className="full gp-paidby" role="radiogroup" aria-label="Paid By"><span className="pay-label">Paid By</span>{(["Trainee", "Consultancy"] as const).map((v) => <label key={v} className="gp-radio"><input type="radio" name="paid-by" checked={paidBy === v} onChange={() => setPaidBy(v)} />{v}</label>)}</div>;
+  if (canGroup && paidBy === "Consultancy") return <Modal title="Record Payment" onClose={onClose} wide><div className="portal-form cx-pay">{paidBySwitch}<ConsultancyPayment data={data} onClose={onClose} onSaved={onSaved} /></div></Modal>;
   return <Modal title="Record Payment" onClose={onClose} wide>
     <div className="portal-form cx-pay">
       {error && <div className="full"><Message kind="error" text={error} /></div>}
+      {paidBySwitch}
       {!group ? <div className="full cx-pick">
         <label>Find Trainee<input autoFocus role="combobox" aria-expanded={!!term} aria-controls="cx-sug" autoComplete="off" value={search} placeholder="Type a name, NWMTACI No. or course"
           onChange={(ev) => { setSearch(ev.target.value); setHi(0); }}
@@ -493,6 +500,96 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
       </span>}</div>
     </div>
   </Modal>;
+}
+
+/**
+ * Record Payment › Paid By: Consultancy (owner, 12 Nov 2026, Option B). One transfer and one reference for several
+ * trainees: pick the consultancy, its trainees with a balance are listed and ticked, untick or lower any amount,
+ * and Record Payment stays off until the ticked amounts equal the transfer. Each trainee gets their own receipt.
+ */
+function ConsultancyPayment({ data, onClose, onSaved }: { data: PortalData; onClose: () => void; onSaved: () => Promise<void> }) {
+  const agencies = data.agencies.filter((a) => a.active);
+  const modes = modeNames(data).filter((m) => needsReference(data, m));
+  const usable = (e: Enrollment) => e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id] && balanceOf(e) > 0;
+  const theirs = (id: string) => consultancyOpen(data.enrollments.filter(usable), id, data.referralByEnrollment, balanceOf);
+  const money = (c: number) => (c / 100).toFixed(2);
+  const [agencyId, setAgencyId] = useState(agencies[0]?.id ?? "");
+  const [extra, setExtra] = useState<string[]>([]);
+  const [amounts, setAmounts] = useState<Record<string, string>>(() => Object.fromEntries(theirs(agencies[0]?.id ?? "").map((e) => [e.id, money(balanceOf(e))])));
+  const [method, setMethod] = useState(modes[0] ?? ""), [reference, setReference] = useState(""), [total, setTotal] = useState("");
+  const [receivedAt, setReceivedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+  const [proofFile, setProofFile] = useState<File | null>(null), [proof, setProof] = useState<{ id: string; path: string } | null>(null);
+  const [adding, setAdding] = useState(false), [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
+  const [done, setDone] = useState<{ groupNo: string; payments: { payment_id: string; trainee_id: string; amount_centavos: number; verification_state: string }[] } | null>(null);
+  const term = q.trim().toLowerCase();
+  useNeedSince(term ? ALL_DATES : "");
+  const agency = agencies.find((a) => a.id === agencyId);
+  const listed = [...theirs(agencyId), ...extra.map((id) => data.enrollments.find((e) => e.id === id)).filter((e): e is Enrollment => !!e && !theirs(agencyId).some((x) => x.id === e.id))];
+  const others = term ? data.enrollments.filter((e) => usable(e) && !listed.some((x) => x.id === e.id) && `${traineeName(e)} ${e.enrollment_number} ${courseCode(e)}`.toLowerCase().includes(term)).slice(0, 6) : [];
+  const lines = listed.map((e) => ({ enrollmentId: e.id, amountCentavos: toCentavos(amounts[e.id] ?? "") })).filter((l) => l.amountCentavos > 0);
+  const totalCentavos = toCentavos(total), split = lines.reduce((t, l) => t + l.amountCentavos, 0), diff = totalCentavos - split;
+  const problem = groupProblem({ totalCentavos, reference, lines, balances: new Map(listed.map((e) => [e.id, balanceOf(e)])) });
+  const ready = !problem && !!agency && !!method && (!!proofFile || !!proof);
+  function pickAgency(id: string) { setAgencyId(id); setExtra([]); const t = theirs(id); setAmounts(Object.fromEntries(t.map((e) => [e.id, money(balanceOf(e))]))); }
+  function add(e: Enrollment) { setExtra((cur) => [...cur, e.id]); setAmounts((cur) => ({ ...cur, [e.id]: money(balanceOf(e)) })); setQ(""); setAdding(false); }
+  async function fileProof() {
+    if (proof) return proof;
+    if (!proofFile || !agency) throw new Error("Attach the transfer screenshot.");
+    const form = new FormData();
+    form.set("proof", await shrinkProof(proofFile)); form.set("companyName", agency.name); form.set("mode", method);
+    form.set("receivedAt", new Date(receivedAt).toISOString()); form.set("reference", reference.trim());
+    const response = await fetch("/api/staff/payment-proofs/drive", { method: "POST", body: form });
+    const text = await response.text();
+    let body: { proofId?: string; drivePath?: string; error?: string } = {};
+    try { body = JSON.parse(text); } catch { body = { error: response.status === 413 ? "The proof file is too large. Use a screenshot or a PDF under 4 MB." : "Could not save the proof to Google Drive." }; }
+    if (!response.ok || !body.proofId) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
+    const filed = { id: body.proofId, path: body.drivePath ?? "" };
+    setProof(filed);
+    return filed;
+  }
+  async function post() {
+    setBusy(true); setError("");
+    try {
+      const filed = await fileProof();
+      const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "payment-group", agencyId, method, receivingAccount: method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), totalCentavos, proofId: filed.id, lines, confirmDuplicate: dupConfirmed }) });
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 409 && body.duplicate) { setDupWarning(true); return; }
+      if (!response.ok) throw new Error(body.error ?? "Could not record the payment.");
+      setDone({ groupNo: body.groupNo, payments: body.payments ?? [] });
+      await onSaved();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not record the payment."); } finally { setBusy(false); }
+  }
+  const nameOf = (traineeId: string) => { const e = data.enrollments.find((x) => x.trainee_id === traineeId); return e ? traineeName(e) : "Trainee"; };
+  if (done) return <>
+    <div className="full"><Message kind="success" text={`${done.groupNo}: ${pesos(totalCentavos)} from ${agency?.name ?? "the consultancy"} for ${done.payments.length} trainee${done.payments.length === 1 ? "" : "s"}, reference ${reference.trim()}.`} /></div>
+    <div className="cx-receipts full">{done.payments.map((p) => <div key={p.payment_id}><span><b>{nameOf(p.trainee_id)}</b><small className="cx-amt">{pesos(p.amount_centavos)}{p.verification_state !== "Verified" ? " · Duplicate Reference" : ""}</small></span><ReceiptButton data={data} paymentId={p.payment_id} reload={onSaved} /></div>)}</div>
+    <div className="portal-form-actions full"><button type="button" className="portal-primary" onClick={onClose}>Done</button></div>
+  </>;
+  return <>
+    {error && <div className="full"><Message kind="error" text={error} /></div>}
+    <label className="full">Consultancy<select value={agencyId} onChange={(ev) => pickAgency(ev.target.value)}>{!agencies.length && <option value="">No Consultancy</option>}{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+    <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); setProof(null); }}>{m}</button>)}</div></div>
+    <label>Reference Number (Required)<input className="cx-mono" value={reference} onChange={(ev) => { setReference(ev.target.value.toUpperCase()); setDupWarning(false); setDupConfirmed(false); }} placeholder={`${method} reference`} /></label>
+    <label>Total Transfer (PHP)<input className="cx-mono" inputMode="decimal" value={total} onChange={(ev) => setTotal(ev.target.value)} placeholder="0.00" /></label>
+    <label>Received at<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
+    <label>Transfer Screenshot (Required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the consultancy&apos;s name.</small>}</label>
+    <div className="cx-lines full"><table><thead><tr><th aria-label="Include"></th><th>Their Trainees with a Balance</th><th className="r">Balance</th><th className="r">Pays</th></tr></thead><tbody>
+      {listed.map((e) => { const v = amounts[e.id] ?? ""; const on = toCentavos(v) > 0; return <tr key={e.id} className={on ? "sel" : ""}>
+        <td><input type="checkbox" className="cx-tickbox" checked={on} aria-label={`Include ${traineeName(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.checked ? money(balanceOf(e)) : "" }))} /></td>
+        <td><b>{traineeName(e)}</b> <small>{courseCode(e)} · {e.enrollment_number}{extra.includes(e.id) ? " · added" : ""}</small></td>
+        <td className="r cx-amt">{pesos(balanceOf(e))}</td>
+        <td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${traineeName(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{toCentavos(v) > balanceOf(e) && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
+      {!listed.length && <tr><td colSpan={4}><small>No trainee of this consultancy has a balance. Use Add a Trainee Not Listed.</small></td></tr>}
+      <tr className="cx-chiprow"><td colSpan={4}>{adding ? <div className="gp-add"><input autoFocus value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Type a name, NWMTACI No. or course" aria-label="Find a trainee to add" />
+        {others.map((e) => <button key={e.id} type="button" className="gp-addrow" onClick={() => add(e)}><span><b>{traineeName(e)}</b> · {courseCode(e)}</span><strong className="cx-amt">{pesos(balanceOf(e))}</strong></button>)}
+        {term && !others.length && <small>No trainee with a balance matches “{q.trim()}”.</small>}</div> : <button type="button" className="cx-textbtn" onClick={() => setAdding(true)}>+ Add a Trainee Not Listed</button>}</td></tr>
+    </tbody></table></div>
+    <div className={`cx-tally full ${diff === 0 && split > 0 ? "ok" : "no"}`}><span>Ticked {pesos(split)} of {pesos(totalCentavos)} · {lines.length} trainee{lines.length === 1 ? "" : "s"}</span><span>{!totalCentavos ? "Enter the total transfer" : diff === 0 ? (problem ?? "Balanced") : diff > 0 ? `${pesos(diff)} not yet split` : `${pesos(-diff)} over the transfer`}</span></div>
+    <p className="portal-form-note full">Each trainee gets their own Acknowledgement Receipt and TAR with this reference. Payments in this transfer are not marked Duplicate Reference.</p>
+    {dupWarning && <div className="full cx-dup"><Message kind="error" text={`Reference ${reference.trim()} was already used on another payment. Check the transfer before recording it again.`} /><label className="portal-check"><input type="checkbox" checked={dupConfirmed} onChange={(ev) => setDupConfirmed(ev.target.checked)} /><span>I checked it; record this payment anyway</span></label></div>}
+    <div className="portal-form-actions full cx-foot"><button type="button" className="cx-textbtn" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready || busy || (dupWarning && !dupConfirmed)} onClick={() => void post()}>{busy ? "Recording…" : `Record ${totalCentavos > 0 ? pesos(totalCentavos) : "Payment"}`}</button></div>
+  </>;
 }
 
 /**

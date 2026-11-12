@@ -231,3 +231,12 @@
 .sa-calc b { display: block; color: var(--c-navy); font-size: 17px; font-variant-numeric: tabular-nums; }
 .sa-calc .sa-add b { color: var(--c-primary); }
 @media (max-width: 480px) { .sa-calc { grid-template-columns: minmax(0, 1fr); } }
+
+/* Record Payment › Paid By: Consultancy (owner, 12 Nov 2026). */
+.gp-paidby { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-5); }
+.gp-paidby .pay-label { margin: 0; }
+.gp-radio { display: inline-flex !important; align-items: center; gap: var(--sp-2); font-weight: 500 !important; color: var(--c-text) !important; font-size: var(--fs-body) !important; cursor: pointer; }
+.gp-radio input { width: 18px; height: 18px; accent-color: var(--c-primary); margin: 0; }
+.gp-add { display: grid; gap: var(--sp-2); }
+.gp-addrow { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-control); background: var(--c-surface); color: var(--c-text); font: inherit; text-align: left; cursor: pointer; }
+.gp-addrow:hover { border-color: var(--c-border-strong); background: var(--c-bg); }
