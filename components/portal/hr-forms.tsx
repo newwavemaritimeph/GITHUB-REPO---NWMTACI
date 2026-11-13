@@ -20,7 +20,9 @@ export function HrFormModal({ title, fields, initial = {}, submitLabel = "Save",
   title: string; fields: HrField[]; initial?: Record<string, string>; submitLabel?: string; wide?: boolean; note?: ReactNode;
   onSubmit: (values: Record<string, string>) => Promise<void>; onClose: () => void;
 }) {
-  const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, initial[f.key] ?? ""])));
+  // A required dropdown shows its first option, so it starts with that value too (else it saves "" while looking chosen).
+  const firstOf = (f: HrField) => { const o = f.type === "select" && f.required ? f.options?.[0] : undefined; return o === undefined ? "" : Array.isArray(o) ? o[0] : o; };
+  const [v, setV] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, initial[f.key] || firstOf(f)])));
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const set = (k: string) => (e: { target: { value: string } }) => setV((cur) => ({ ...cur, [k]: e.target.value }));
   return <Modal title={title} onClose={onClose} wide={wide}>
