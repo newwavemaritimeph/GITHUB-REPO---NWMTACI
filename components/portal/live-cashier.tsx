@@ -7,7 +7,7 @@ import { depositedOn, drawerExpected, fromLabel, type BankDeposit } from "@/lib/
 import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
-import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
+import { addDays, balanceOf, dueCentavos, first, manilaToday, noFeeSet, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
 import { ActionsMenu, ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
 import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
@@ -242,8 +242,8 @@ export function paidSections<G extends { balance: number; paid: number }>(groups
   return { withBalance, fullyPaid, fullyPaidTotal: fullyPaid.reduce((s, g) => s + g.paid, 0) };
 }
 const Who = ({ name, number }: { name: string; number?: string }) => <><span className="cx-name">{name}</span>{number ? <span className="cx-id">{number}</span> : null}</>;
-const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
-const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled", "Company Charge": "pending" };
+const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : noFeeSet(e) ? "No Fee Set" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
+const PAY_TONE: Record<string, string> = { "No Fee Set": "orange", Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled", "Company Charge": "pending" };
 
 /** Company Charge (owner, 29 Oct 2026; 5 Nov 2026): one payment for a partner's Billing Statement, with its proof, and one Service Invoice to the company. */
 export function CompanyPaymentModal({ data, reload, onClose, initialId }: { data: PortalData; reload: () => Promise<void>; onClose: () => void; initialId?: string }) {
@@ -843,10 +843,11 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   </div>;
 }
 
-const STATUS_ORDER = ["Unpaid", "Partially paid", "Company Charge", "Paid", "Cancelled"] as const;
+const STATUS_ORDER = ["No Fee Set", "Unpaid", "Partially paid", "Company Charge", "Paid", "Cancelled"] as const;
 /** Every enrollment with its payment status, filtered by status and enrolled date. */
 export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; onOpenTrainee?: (traineeId: string) => void }) {
   const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
+  const { busy, msg, post } = usePost(reload);
   const rowState = (e: Enrollment) => (e.enrollment_status !== "Cancelled" && data.companyCharge?.[e.id] && balanceOf(e) > 0 ? "Company Charge" : payState(e));
   const [q, setQ] = useState("");
   // Hidden until a date is picked; a search looks across all dates (owner, 5 Nov 2026).
@@ -865,8 +866,9 @@ export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { dat
     <div className="cx-bar"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number or course" aria-label="Search enrollments" />
     </div>
     <MonthBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} searching={!!term} />
+    {msg && <Message kind={msg.kind} text={msg.text} />}
     {(per.picked || !!term) && <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total Due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-      {paged.shown.map((e) => { const st = rowState(e); return <tr key={e.id}><td data-l="" className="lead">{onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(e.trainee_id)} title="Open the Trainee Account"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></button> : <Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} />}</td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st === "Company Charge" ? <small className="muted-text">Billed on the Billing Statement</small> : st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id, [e.id])}>Balance</button>}</div></td></tr>; })}
+      {paged.shown.map((e) => { const st = rowState(e); return <tr key={e.id}><td data-l="" className="lead">{onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(e.trainee_id)} title="Open the Trainee Account"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></button> : <Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} />}</td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st === "Company Charge" ? <small className="muted-text">Billed on the Billing Statement</small> : st === "No Fee Set" ? <button type="button" className="portal-secondary" disabled={busy} title="Use the fee in the price list" onClick={() => void post({ action: "enrollment-reprice", enrollmentId: e.id }, `${courseCode(e)} fee applied. ${traineeName(e)} now has a balance to pay.`).catch(() => undefined)}>Apply Fee</button> : st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id, [e.id])}>Balance</button>}</div></td></tr>; })}
     </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>}
   </div>;
 }

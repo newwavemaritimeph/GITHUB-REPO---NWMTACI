@@ -252,7 +252,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
         {rows.map((e) => { const c = certOf(data, e.id); const snap = (c?.snapshot ?? {}) as { certificate_number?: string }; const paid = isPaid(e); const printed = c?.status === "Printed" || c?.status === "Released"; return <tr key={e.id}>
           <td><strong>{traineeName(e)}</strong><small>{e.enrollment_number}</small></td>
           <td>{one(e.courses)?.name}<small>{one(e.courses)?.code}</small></td>
-          <td><span className={`portal-badge ${paid ? "green" : "red"}`}>{paid ? "Paid" : "Balance"}</span></td>
+          <td><span className={`portal-badge ${paid && dueOf(e) > 0 ? "green" : paid ? "orange" : "red"}`}>{paid && dueOf(e) > 0 ? "Paid" : paid && Number(e.paid_centavos) <= 0 ? "No Fee Set" : paid ? "Paid" : "Balance"}</span></td>
           <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <span className="document-actions" style={{ marginTop: 4 }}><button type="button" className="ghost-button" onClick={() => copyLink(e.feedback_token!)}>Copy Link</button><button type="button" className="ghost-button" disabled={busy} onClick={() => void sendFeedback(e)}>Email Form</button></span>}</td>
           <td><strong>{c?.status ?? "Not issued"}</strong><small>{snap.certificate_number ? `No. ${snap.certificate_number}` : "—"}{c?.reprint_count ? ` · ${c.reprint_count} reprint(s)` : ""}</small></td>
           <td className="document-actions">

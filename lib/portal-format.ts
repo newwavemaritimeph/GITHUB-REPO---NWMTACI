@@ -38,6 +38,12 @@ export const balanceOf = (e: BillableEnrollment) => Math.max(0, dueCentavos(e) -
  * Payments and Enrollment-reports screens but *status not yet Enrolled* on the
  * Enrollment summary, so the two reported different numbers for the same day.
  */
+/**
+ * A live enrollment with a ₱0 fee and nothing paid (owner, 13 Nov 2026: "NO PAYMENT WHY PAID?"): the course had
+ * no fee in the price list when the trainee enrolled. It shows "No Fee Set", never "Paid".
+ */
+export const noFeeSet = (e: BillableEnrollment) => e.enrollment_status !== "Cancelled" && dueCentavos(e) <= 0 && Number(e.paid_centavos ?? 0) <= 0;
+
 export const isUnpaid = (e: BillableEnrollment) => e.enrollment_status !== "Cancelled" && balanceOf(e) > 0;
 
 /** Pesos with centavos shown — for ledgers and closings, where the cents matter. */
