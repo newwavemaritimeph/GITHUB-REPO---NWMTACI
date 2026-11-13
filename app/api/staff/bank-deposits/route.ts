@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   const role = staff.roleCodes.includes("admin") ? "admin" : staff.roleCodes.includes("accounting") ? "accounting" : "cashier";
   const audit = (action: string, id: string, prior: unknown, next: unknown, reason?: string) =>
     db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action, record_type: "bank_deposit", record_id: id, prior_values: prior ?? null, new_values: next ?? null, reason: reason || null });
-  const fail = (e: { message: string }) => NextResponse.json({ error: /cheque_no|source/.test(e.message) ? "Apply database update 202611120100 first." : /bank_deposits/.test(e.message) ? "Apply database update 202611110097 first." : e.message }, { status: 400 });
+  const fail = (e: { message: string }) => NextResponse.json({ error: /column|schema cache/i.test(e.message) && /cheque_no|source/.test(e.message) ? `Apply database update 202611120100 first (${e.message}).` : /relation|schema cache/i.test(e.message) && /bank_deposits/.test(e.message) ? "Apply database update 202611110097 first." : e.message }, { status: 400 });
   const load = async (id: string) => (await db.from("bank_deposits").select("id,deposit_no,amount_centavos,account,status,reference,source").eq("id", id).maybeSingle()).data as (Pick<BankDeposit, "id" | "deposit_no" | "amount_centavos" | "account" | "reference" | "source"> & { status: DepositStatus }) | null;
   const move = async (id: string, act: DepositAction, patch: Record<string, unknown>, reason?: string) => {
     const d = await load(id);
