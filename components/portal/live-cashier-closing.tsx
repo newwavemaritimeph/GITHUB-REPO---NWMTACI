@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Message, submit } from "./shared-ui";
+import { Badge, Message, Modal, submit } from "./shared-ui";
 import { BILLS, closingCheck, countedCentavos, isCash, isGcash, type DayFigures } from "@/lib/cashier-drawer";
 import { depositedOn, type BankDeposit } from "@/lib/bank-deposits";
 
@@ -19,6 +19,8 @@ export type ClosingData = {
   expenses?: { amount_centavos: number; status: string; payment_channel?: string | null; paid_at?: string | null }[];
   otherIncome?: { amount_centavos: number; channel?: string | null; received_on?: string | null; voided_at?: string | null }[];
   bankDeposits?: BankDeposit[];
+  /** Accounting's edits (202611130103), by closing or opening id. */
+  closingEdits?: Record<string, { at: string; reason: string | null; by: string | null }>;
 };
 type Step = "Opening" | "Today" | "Closing" | "History";
 
@@ -31,7 +33,7 @@ const cents = (s: string) => Math.round((Number(String(s).replace(/,/g, "")) || 
 const sum = (rows: { amount_centavos: number }[]) => rows.reduce((s, r) => s + Number(r.amount_centavos), 0);
 const varBadge = (v: number | null | undefined) => v == null ? <Badge tone="slate">—</Badge> : v === 0 ? <Badge tone="green">Balanced</Badge> : v > 0 ? <Badge tone="orange">{`Over ${peso(v)}`}</Badge> : <Badge tone="red">{`Short ${peso(-v)}`}</Badge>;
 
-export function LiveCashierClosing({ data, reload, canAct = true }: { data: ClosingData; reload: () => Promise<void>; canAct?: boolean; initialOpening?: number }) {
+export function LiveCashierClosing({ data, reload, canAct = true, canEdit = false }: { data: ClosingData; reload: () => Promise<void>; canAct?: boolean; canEdit?: boolean; initialOpening?: number }) {
   const d = today();
   const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === d);
   const closed = data.cashierClosings.find((c) => c.closing_date === d);
@@ -40,6 +42,7 @@ export function LiveCashierClosing({ data, reload, canAct = true }: { data: Clos
   const [counts, setCounts] = useState<Record<number, string>>({}), [gBal, setGBal] = useState(""), [shot, setShot] = useState<File | null>(null), [remarks, setRemarks] = useState("");
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [month, setMonth] = useState(d.slice(0, 7));
+  const [editing, setEditing] = useState<EditTarget | null>(null);
 
   const f: DayFigures = (() => {
     const pays = data.payments.filter((p) => p.valid !== false && dayOf(p.received_at) === d);
@@ -80,6 +83,10 @@ export function LiveCashierClosing({ data, reload, canAct = true }: { data: Clos
   const done = (s: Step) => (s === "Opening" && !!opening) || (s === "Closing" && !!closed);
   const history = data.cashierClosings.filter((c) => c.closing_date.startsWith(month)).sort((a, b) => b.closing_date.localeCompare(a.closing_date));
   const months = [...new Set([d.slice(0, 7), ...data.cashierClosings.map((c) => c.closing_date.slice(0, 7))])].sort().reverse();
+  // Accounting also sees days opened but not closed, so a wrong opening can be corrected.
+  const openOnly = canEdit ? (data.cashierOpenings ?? []).filter((o) => o.opening_date.startsWith(month) && !data.cashierClosings.some((c) => c.closing_date === o.opening_date)).sort((a, b) => b.opening_date.localeCompare(a.opening_date)) : [];
+  const openingOf = (date: string) => (data.cashierOpenings ?? []).find((o) => o.opening_date === date);
+  const editedLine = (id?: string) => { const e = id ? data.closingEdits?.[id] : undefined; return e ? <small className="oc-edited">Edited{e.by ? ` by ${e.by}` : ""} · {e.reason}</small> : null; };
 
   return <div className="portal-page hr-page oc-page">
     <div className="portal-heading hr-head"><div><span className="portal-eyebrow">Reports</span><h1>Opening and Closing</h1></div>
@@ -129,13 +136,55 @@ export function LiveCashierClosing({ data, reload, canAct = true }: { data: Clos
     </>)}
 
     {step === "History" && <section className="portal-panel hr-table"><div className="panel-heading"><h2>Closings</h2><select className="hr-show" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month">{months.map((m) => <option key={m} value={m}>{new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric" }).format(new Date(`${m}-01T00:00:00+08:00`))}</option>)}</select></div>
-      <div className="portal-table-wrap"><table className="portal-table cx-cards oc-table"><thead><tr><th rowSpan={2}>Date</th><th colSpan={3} className="oc-grp">Cash</th><th colSpan={3} className="oc-grp">GCash</th><th rowSpan={2}>Status</th></tr>
+      <div className="portal-table-wrap"><table className="portal-table cx-cards oc-table"><thead><tr><th rowSpan={2}>Date</th><th colSpan={3} className="oc-grp">Cash</th><th colSpan={3} className="oc-grp">GCash</th><th rowSpan={2}>Status</th>{canEdit && <th rowSpan={2} aria-label="Edit" />}</tr>
         <tr><th className="num oc-g1">Expected</th><th className="num">Counted</th><th>Variance</th><th className="num oc-g1">Expected</th><th className="num">In the App</th><th>Variance</th></tr></thead>
         <tbody>{history.map((c) => { const x = data.closingExtras?.[c.id]; return <tr key={c.id}>
-          <td className="lead" data-l="Date"><strong>{fd(c.closing_date)}</strong>{(x?.remarks) && <small>{x.remarks}</small>}</td>
+          <td className="lead" data-l="Date"><strong>{fd(c.closing_date)}</strong>{(x?.remarks) && <small>{x.remarks}</small>}{editedLine(c.id)}</td>
           <td data-l="Cash Expected" className="num oc-g1">{peso(c.expected_cash_centavos)}</td><td data-l="Counted" className="num">{c.actual_cash_centavos == null ? "—" : peso(c.actual_cash_centavos)}</td><td data-l="Cash Variance">{varBadge(c.variance_centavos)}</td>
           <td data-l="GCash Expected" className="num oc-g1">{x?.expected_gcash_centavos == null ? "—" : peso(x.expected_gcash_centavos)}</td><td data-l="In the App" className="num">{x?.actual_gcash_centavos == null ? "—" : <>{peso(x.actual_gcash_centavos)}{x.gcash_screenshot_link && <a className="hr-link" href={x.gcash_screenshot_link} target="_blank" rel="noreferrer"> Screenshot</a>}</>}</td><td data-l="GCash Variance">{x?.expected_gcash_centavos == null ? "—" : varBadge(x.gcash_variance_centavos)}</td>
-          <td data-l="Status"><Badge tone={c.status === "Reviewed" ? "green" : "blue"}>{c.status === "Submitted" ? "For Review" : c.status}</Badge></td></tr>; })}
-          {!history.length && <tr><td colSpan={8} className="hr-none">No closings in this month.</td></tr>}</tbody></table></div></section>}
+          <td data-l="Status"><Badge tone={c.status === "Reviewed" ? "green" : "blue"}>{c.status === "Submitted" ? "For Review" : c.status}</Badge></td>{canEdit && <td data-l="" className="hr-cell-acts"><button type="button" className="portal-secondary row-act" onClick={() => setEditing({ date: c.closing_date, closing: c, extra: x, opening: openingOf(c.closing_date) })}>Edit</button></td>}</tr>; })}
+          {openOnly.map((o) => <tr key={o.id}><td className="lead" data-l="Date"><strong>{fd(o.opening_date)}</strong><small>Opening {peso(o.opening_cash_centavos)} cash{o.opening_gcash_centavos != null ? ` · ${peso(o.opening_gcash_centavos)} GCash` : ""}</small>{editedLine(o.id)}</td><td colSpan={6} data-l="" className="hr-none">Not closed yet</td><td data-l="Status"><Badge tone="orange">Not Closed</Badge></td><td data-l="" className="hr-cell-acts"><button type="button" className="portal-secondary row-act" onClick={() => setEditing({ date: o.opening_date, opening: o })}>Edit</button></td></tr>)}
+          {!history.length && !openOnly.length && <tr><td colSpan={canEdit ? 9 : 8} className="hr-none">No closings in this month.</td></tr>}</tbody></table></div></section>}
+    {editing && <EditDayModal target={editing} onClose={() => setEditing(null)} onSaved={async (text) => { await reload(); setMsg({ kind: "success", text }); }} />}
   </div>;
+}
+
+type Opening = NonNullable<ClosingData["cashierOpenings"]>[number];
+type EditTarget = { date: string; closing?: Closing; extra?: Extra; opening?: Opening };
+/**
+ * Accounting edits a day (owner, 13 Nov 2026): opening, count and remarks, with a required reason. The expected amounts
+ * move with the opening here; the server works them out again from the day's records when it saves.
+ */
+function EditDayModal({ target, onClose, onSaved }: { target: EditTarget; onClose: () => void; onSaved: (text: string) => Promise<void> }) {
+  const { closing: c, extra: x, opening: o } = target;
+  const was = { oCash: Number(o?.opening_cash_centavos ?? c?.opening_cash_centavos ?? 0), oG: Number(o?.opening_gcash_centavos ?? x?.opening_gcash_centavos ?? 0), cCash: Number(c?.actual_cash_centavos ?? 0), cG: Number(x?.actual_gcash_centavos ?? 0) };
+  const money = (v: number) => (v / 100).toFixed(2);
+  const [f, setF] = useState({ oCash: money(was.oCash), oG: money(was.oG), cCash: money(was.cCash), cG: money(was.cG), remarks: x?.remarks ?? "", reason: "" });
+  const [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((v) => ({ ...v, [k]: e.target.value }));
+  const expCash = c ? c.expected_cash_centavos - was.oCash + cents(f.oCash) : null;
+  const expG = x?.expected_gcash_centavos != null ? x.expected_gcash_centavos - was.oG + cents(f.oG) : null;
+  const ch = (k: "oCash" | "oG" | "cCash" | "cG") => cents(f[k]) !== was[k] ? "oc-chg" : undefined;
+  async function save() {
+    setBusy(true); setErr("");
+    try {
+      const r = await fetch("/api/staff/cashier-close", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "edit", closingId: c?.id ?? null, openingId: !c ? o?.id ?? null : null, openingCashCentavos: cents(f.oCash), openingGcashCentavos: cents(f.oG), ...(c ? { countedCashCentavos: cents(f.cCash), countedGcashCentavos: cents(f.cG), remarks: f.remarks.trim() } : {}), reason: f.reason.trim() }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error ?? "Could not save the edit.");
+      await onSaved(`${fd(target.date)} saved. The expected amounts were worked out again; the change and the reason are in the audit log.`); onClose();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Could not save the edit."); } finally { setBusy(false); }
+  }
+  return <Modal title={`Edit ${fd(target.date)}?`} eyebrow="Opening and Closing" onClose={onClose} size="md">
+    <div className="portal-form hr-form">
+      {err && <p className="hr-form-err full" role="alert">{err}</p>}
+      <label>Opening Cash (PHP)<input className={ch("oCash")} inputMode="decimal" value={f.oCash} onChange={set("oCash")} /></label>
+      <label>Opening GCash (PHP)<input className={ch("oG")} inputMode="decimal" value={f.oG} onChange={set("oG")} /></label>
+      {c && <><label>Cash Counted (PHP)<input className={ch("cCash")} inputMode="decimal" value={f.cCash} onChange={set("cCash")} /></label>
+        <label>GCash in the App (PHP)<input className={ch("cG")} inputMode="decimal" value={f.cG} onChange={set("cG")} /></label>
+        <label className="full">Remarks<input value={f.remarks} maxLength={500} onChange={set("remarks")} /></label>
+        <div className="oc-calc full"><div><small>Cash Expected</small><b>{peso(expCash ?? 0)}</b>{varBadge(cents(f.cCash) - (expCash ?? 0))}</div>{expG != null && <div><small>GCash Expected</small><b>{peso(expG)}</b>{varBadge(cents(f.cG) - expG)}</div>}</div></>}
+      <label className="full oc-reason">Reason for Edit (Required)<textarea maxLength={300} value={f.reason} onChange={set("reason")} placeholder="e.g. The Cashier typed the opening cash wrong; checked the count sheet" /></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || f.reason.trim().length < 5} onClick={() => void save()}>{busy ? "Saving…" : "Save Edit"}</button></div>
+    </div>
+  </Modal>;
 }

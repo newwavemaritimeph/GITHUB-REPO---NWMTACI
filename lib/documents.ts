@@ -810,7 +810,8 @@ export function fitVoucherLines(descriptions: string[], space: number, linesAt: 
  */
 export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) {
   const pdf = await PDFDocument.create();
-  const W = 595.28, H = 419.53;
+  // Half of 8.5" x 13" (owner, 13 Nov 2026: the papers are 8.5x13 and A4): 8.5" x 6.5" landscape.
+  const W = 612, H = 468;
   const page = pdf.addPage([W, H]);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);

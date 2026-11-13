@@ -186,7 +186,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary","MyHr"],
   // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
-  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Bank ledger","Bank accounts","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements","Special arrangement rates",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Bank ledger","Bank accounts","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements","Special arrangement rates","Opening and closing",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -201,7 +201,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},{label:"Other income",icon:"₱",roles:["cashier","accounting"],group:"Accounting"},
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
-  {label:"Daily summary",icon:"∑",roles:["cashier","accounting"],group:"Records"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Records"},{label:"Expenses summary",icon:"∑",roles:["cashier"],group:"Records"},
+  {label:"Daily summary",icon:"∑",roles:["cashier","accounting"],group:"Records"},{label:"Opening and closing",icon:"⚖",roles:["cashier","accounting"],group:"Records"},{label:"Expenses summary",icon:"∑",roles:["cashier"],group:"Records"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   ...HR_VIEWS.map(label=>({label,icon:"♙",roles:["admin","hr"],group:"People" as NavGroup})),
   {label:"Portal sounds",icon:"♪",roles:["admin"],group:"Configuration"},
@@ -244,7 +244,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
   {label:"Transactions",items:["Payments","Other income","Expenses","Bank deposits","Bank ledger","Payables"]},
-  {label:"Reports",items:["Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements"]},
+  {label:"Reports",items:["Daily summary","Opening and closing","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS,"Special arrangement rates","Bank accounts"]},
   {label:"MyHr",items:["MyHr"]},
 ];
@@ -476,6 +476,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay} reload={reload}/>;
   if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>} account={(id,close)=>{const t=data.trainees.find(x=>x.id===id);return t?<TraineeDetailModal data={data} trainee={t} reload={reload} role={gateRole} onClose={close}/>:null}}/>;
+  // Opening and Closing for Accounting (owner, 13 Nov 2026): the history, with Edit and a reason.
+  if(active==="Opening and closing"&&gateRole==="accounting")return <LiveCashierClosing data={data} reload={reload} canAct={false} canEdit/>;
   // Special Arrangement fees (owner, 12 Nov 2026): Accounting and the Admin monitor, decide and set the rates.
   if(active==="Special arrangements"&&["accounting","admin"].includes(gateRole))return <SpecialArrangementsReport data={data} reload={reload} canDecide/>;
   if(active==="Special arrangement rates"&&["accounting","admin"].includes(gateRole))return <SpecialRatesSetup data={data} reload={reload}/>;

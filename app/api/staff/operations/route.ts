@@ -1324,6 +1324,17 @@ export async function GET(request: Request) {
     const { data: g, error: gErr } = await createSupabaseAdminClient().from("cashier_openings").select("id,opening_gcash_centavos").eq("cashier_id", staff.user.id).order("opening_date", { ascending: false }).limit(31);
     if (!gErr) { const byId = new Map((g ?? []).map((r) => [r.id, r.opening_gcash_centavos])); cashierOpenings = (cashierOpenings as { id: string }[]).map((o) => ({ ...o, opening_gcash_centavos: byId.get(o.id) ?? null })); }
   });
+  // Edits by Accounting (202611130103; empty without it): who edited a day, when and why.
+  let closingEdits: Record<string, { at: string; reason: string | null; by: string | null }> = {};
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const admin = createSupabaseAdminClient();
+    const [cl, op] = await Promise.all([admin.from("cashier_closings").select("id,edited_at,edit_reason,edited_by").not("edited_at", "is", null).limit(400), admin.from("cashier_openings").select("id,edited_at,edit_reason,edited_by").not("edited_at", "is", null).limit(400)]);
+    if (cl.error || op.error) return;
+    const rows = [...(cl.data ?? []), ...(op.data ?? [])] as { id: string; edited_at: string; edit_reason: string | null; edited_by: string | null }[];
+    const ids = [...new Set(rows.map((r) => r.edited_by).filter(Boolean) as string[])];
+    const who = new Map(((ids.length ? (await admin.from("profiles").select("id,complete_name").in("id", ids)).data : []) ?? []).map((p) => [p.id as string, p.complete_name as string]));
+    closingEdits = Object.fromEntries(rows.map((r) => [r.id, { at: r.edited_at, reason: r.edit_reason, by: who.get(r.edited_by ?? "") ?? null }]));
+  });
   // Closing extras (202611110099): the GCash side, bank deposits and the bill count.
   let closingExtras: Record<string, unknown> = {};
   if (canCashier(staff.roleCodes)) task(async () => {
@@ -1538,7 +1549,7 @@ export async function GET(request: Request) {
   // Portal sounds (owner, 10 Nov 2026): set by the Admin; on for every role until migration 202611100096.
   const soundRow = await db.from("organization_settings").select("portal_sound").maybeSingle();
   const portalSound = (soundRow.error ? null : (soundRow.data as { portal_sound?: Record<string, boolean> } | null)?.portal_sound) ?? null;
-  return NextResponse.json({ hrPlus, portalSound, bankDeposits, specialRates, specialRequests, closingExtras, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ hrPlus, portalSound, bankDeposits, closingEdits, specialRates, specialRequests, closingExtras, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],

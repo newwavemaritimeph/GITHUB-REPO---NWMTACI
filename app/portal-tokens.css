@@ -269,3 +269,12 @@
 .rv-facts dt { color: var(--c-muted); } .rv-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .rv-detail-acts { margin-top: var(--sp-4); }
 @media (max-width: 900px) { .rv-detail { grid-template-columns: minmax(0, 1fr); } .rv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Accounting edits a day's Opening and Closing (owner, 13 Nov 2026). */
+.oc-edited { display: block; color: var(--c-warning); font-weight: 600; }
+.portal-form input.oc-chg { border-color: var(--c-primary); background: var(--c-warning-bg); }
+.oc-calc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.oc-calc > div { display: grid; gap: var(--sp-1); border: 1px solid var(--c-border); border-radius: var(--r-control); padding: var(--sp-2) var(--sp-3); }
+.oc-calc small { color: var(--c-muted); } .oc-calc b { color: var(--c-navy); font-variant-numeric: tabular-nums; }
+.oc-reason textarea { min-height: 64px; }
+@media (max-width: 560px) { .oc-calc { grid-template-columns: minmax(0, 1fr); } }
