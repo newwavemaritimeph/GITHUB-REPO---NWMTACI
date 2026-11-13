@@ -299,7 +299,10 @@ const traineeUpdateInput = z.object({ action: z.literal("trainee-update"), train
   address: z.string().trim().min(8, "Enter the complete address.").max(500), placeOfBirth: z.string().trim().max(160).optional(),
   rank: z.string().trim().max(100).optional(), company: z.string().trim().max(160).optional(), suffix: z.string().trim().max(20).optional(),
   emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: optionalContact,
-  facebookUrl: z.string().trim().max(1000).optional().refine((v) => !v || isMetaThreadUrl(v), VALIDATION_MESSAGES.metaThread) });
+  facebookUrl: z.string().trim().max(1000).optional().refine((v) => !v || isMetaThreadUrl(v), VALIDATION_MESSAGES.metaThread),
+  // Name, birth date and SRN (owner, 13 Nov 2026): Registration corrects them with a reason.
+  firstName: z.string().trim().min(1, "Enter the first name.").max(80).optional(), middleName: z.string().trim().max(80).optional(), lastName: z.string().trim().min(1, "Enter the last name.").max(80).optional(),
+  birthdate: z.string().date().optional(), srn: z.string().trim().max(20).optional().refine((v) => !v || isSrn(v), VALIDATION_MESSAGES.srn), identityReason: z.string().trim().max(300).optional() });
 // Registration records the Meta thread link (the conversation) before the hand-over (owner, 4 Nov 2026).
 const traineeFacebookInput = z.object({ action: z.literal("trainee-facebook"), traineeId: z.string().uuid(), url: z.string().trim().max(1000).refine(isMetaThreadUrl, VALIDATION_MESSAGES.metaThread) });
 // One TAR per enrollment date (owner, 3 Nov 2026): enrollmentIds picks the date group; without it, the newest.
@@ -2344,17 +2347,34 @@ export async function POST(request: Request) {
     if (input.action === "trainee-update") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot edit trainee details." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: prior, error: findError } = await admin.from("trainees").select("id,mobile,email,address,place_of_birth,rank,company,suffix,emergency_contact").eq("id", input.traineeId).maybeSingle();
+      const { data: prior, error: findError } = await admin.from("trainees").select("id,mobile,email,address,place_of_birth,rank,company,suffix,emergency_contact,legal_first_name,legal_middle_name,legal_last_name,birthdate,srn").eq("id", input.traineeId).maybeSingle();
       if (findError) throw findError;
       if (!prior) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
+      // Identity fields change only with a reason, audited on their own (owner, 13 Nov 2026).
+      const identity: Record<string, string | null> = {};
+      if (input.firstName !== undefined) identity.legal_first_name = input.firstName;
+      if (input.middleName !== undefined) identity.legal_middle_name = input.middleName || null;
+      if (input.lastName !== undefined) identity.legal_last_name = input.lastName;
+      if (input.birthdate !== undefined) {
+        const today = manilaDate(), age = Number(today.slice(0, 4)) - Number(input.birthdate.slice(0, 4)) - (today.slice(5) < input.birthdate.slice(5) ? 1 : 0);
+        if (input.birthdate > today || age < 15) return NextResponse.json({ error: "Check the birth date: the trainee must be at least 15 years old." }, { status: 400 });
+        identity.birthdate = input.birthdate;
+      }
+      if (input.srn !== undefined) identity.srn = input.srn ? normalizeSrn(input.srn) : null;
+      const priorRow = prior as Record<string, unknown>;
+      const changedKeys = Object.keys(identity).filter((k) => (priorRow[k] ?? null) !== identity[k]);
+      if (changedKeys.length && (input.identityReason ?? "").length < 5) return NextResponse.json({ error: "Give the reason for changing the name, birth date or SRN." }, { status: 400 });
       const next = {
         mobile: normalizePhContactNumber(input.mobile), email: normalizeEmail(input.email), address: input.address,
         place_of_birth: input.placeOfBirth || null, rank: input.rank || null, company: input.company || null, suffix: input.suffix || null,
         emergency_contact: input.emergencyContactName ? { name: input.emergencyContactName, mobile: input.emergencyContactMobile ? normalizePhContactNumber(input.emergencyContactMobile) : null } : {},
       };
-      const { error } = await admin.from("trainees").update(next).eq("id", input.traineeId);
-      if (error) throw error;
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
+      const identityPatch = Object.fromEntries(changedKeys.map((k) => [k, identity[k]]));
+      const { error } = await admin.from("trainees").update({ ...next, ...identityPatch }).eq("id", input.traineeId);
+      if (error) return NextResponse.json({ error: error.code === "23505" && /srn/i.test(error.message) ? "That SRN belongs to another trainee." : error.message }, { status: 400 });
+      const role = staff.roleCodes.includes("registration") ? "registration" : "admin";
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
+      if (changedKeys.length) await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "trainee.identity_changed", record_type: "trainee", record_id: input.traineeId, prior_values: Object.fromEntries(changedKeys.map((k) => [k, priorRow[k] ?? null])), new_values: identityPatch, reason: input.identityReason });
       // A blank Meta thread field keeps the link already recorded.
       if (input.facebookUrl) { const fb = await saveFacebook(admin, input.traineeId, input.facebookUrl, staff.user.id); if (fb.error) return NextResponse.json({ error: fb.error }, { status: 400 }); }
       return NextResponse.json({ ok: true });

@@ -812,7 +812,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
           {requests.length>0&&<section className="tp-panel"><h4>Open Requests</h4>{requests.map(r=><p key={r.id} className="tp-req"><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</section>}
         </div>
         <div className="tp-side">
-          {editing&&reload?<section className="tp-panel"><TraineeEditForm trainee={trainee} facebook={fb} reload={reload} onDone={()=>setEditing(false)}/></section>:<section className="tp-panel"><h4>Personal and Contact</h4>
+          {editing&&reload?<section className="tp-panel"><TraineeEditForm trainee={trainee} facebook={fb} reload={reload} onDone={()=>setEditing(false)} printed={printedCertificates(data,trainee.id)}/></section>:<section className="tp-panel"><h4>Personal and Contact</h4>
             <dl className="tp-kv">
               {([["Birth Date",trainee.birthdate?`${date(trainee.birthdate)}${trainee.place_of_birth?` · ${trainee.place_of_birth}`:""}`:""],["SRN",trainee.srn],["Trainee No.",trainee.trainee_number],["Mobile",trainee.mobile],["Email",trainee.email],["Address",trainee.address],["Company",trainee.company]] as [string,string|null|undefined][])
                 .filter(([,v])=>v).map(([k,v])=><Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}
@@ -880,28 +880,51 @@ function CashierSearchTrainee({data,onPay,reload,role}:{data:PortalData;onPay:(e
   return <><CashierEnrollments data={data} onPay={onPay} reload={reload} onOpenTrainee={setSel}/>{t&&<TraineeDetailModal data={data} trainee={t} reload={reload} role={role} onClose={()=>setSel(null)}/>}</>;
 }
 
-/** Edit a trainee's contact and work details. Name, SRN and birth date stay as recorded. */
-function TraineeEditForm({trainee,facebook,reload,onDone}:{trainee:Trainee;facebook:string;reload:()=>Promise<void>;onDone:()=>void}){
+/** Courses whose certificate is already printed or released; it keeps the old name until Releasing corrects and reprints it. */
+function printedCertificates(data:PortalData,traineeId:string){
+  const mine=new Map(data.enrollments.filter(e=>e.trainee_id===traineeId).map(e=>[e.id,first(e.courses)?.code??first(e.courses)?.name??"Course"]));
+  return (data.certificates as unknown as {enrollment_id:string;status:string}[]).filter(c=>mine.has(c.enrollment_id)&&["Printed","Released"].includes(c.status)).map(c=>mine.get(c.enrollment_id) as string);
+}
+/** Edit a trainee's details. Name, birth date and SRN change only with a reason (owner, 13 Nov 2026). */
+const IDENTITY_FIELDS=[["lastName","Last Name"],["firstName","First Name"],["middleName","Middle Name"],["suffix","Suffix"],["birthdate","Birth Date"],["srn","SRN"]] as const;
+function TraineeEditForm({trainee,facebook,reload,onDone,printed}:{trainee:Trainee;facebook:string;reload:()=>Promise<void>;onDone:()=>void;printed:string[]}){
   const em=trainee.emergency_contact;
-  const [f,setF]=useState({mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??"",facebookUrl:facebook});
+  const was={lastName:trainee.legal_last_name??"",firstName:trainee.legal_first_name??"",middleName:trainee.legal_middle_name??"",suffix:trainee.suffix??"",birthdate:trainee.birthdate??"",srn:trainee.srn??""};
+  const [f,setF]=useState({...was,identityReason:"",mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??"",facebookUrl:facebook});
   const [busy,setBusy]=useState(false),[err,setErr]=useState("");
   const set=(k:keyof typeof f)=>(ev:{target:{value:string}})=>setF(c=>({...c,[k]:ev.target.value}));
-  async function save(){setBusy(true);setErr("");try{await submit({action:"trainee-update",traineeId:trainee.id,...f,facebookUrl:f.facebookUrl===facebook?undefined:f.facebookUrl});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}}
+  const changed=IDENTITY_FIELDS.filter(([k])=>f[k].trim()!==was[k]);
+  const reasonOk=!changed.length||f.identityReason.trim().length>=5;
+  async function save(){
+    if(changed.length&&!(await askConfirm(`Reason: ${f.identityReason.trim()}`,{title:"Save Name Change?",eyebrow:"Trainee Account",record:[changed.map(([k,l])=>`${l}: ${was[k]||"—"}`).join(" · "),changed.map(([k,l])=>`${l}: ${f[k].trim()||"—"}`).join(" · ")],okLabel:"Save Change"})))return;
+    setBusy(true);setErr("");
+    // Identity fields are sent only when changed, so a contact-only edit needs no reason.
+    const identity=Object.fromEntries(changed.filter(([k])=>k!=="suffix").map(([k])=>[k,f[k].trim()]));
+    try{await submit({action:"trainee-update",traineeId:trainee.id,mobile:f.mobile,email:f.email,address:f.address,placeOfBirth:f.placeOfBirth,rank:f.rank,company:f.company,suffix:f.suffix,emergencyContactName:f.emergencyContactName,emergencyContactMobile:f.emergencyContactMobile,facebookUrl:f.facebookUrl===facebook?undefined:f.facebookUrl,...identity,identityReason:changed.length?f.identityReason.trim():undefined});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}
+  }
   return <section className="td-card td-edit"><h4>Edit Details</h4>
     {err&&<Message kind="error" text={err}/>}
-    <p className="td-note">Name, SRN and birth date are kept as recorded.</p>
     <div className="portal-form">
+      <p className="td-group full">Name and Identity</p>
+      <label>Last Name<input className={f.lastName.trim()!==was.lastName?"td-changed":""} value={f.lastName} onChange={set("lastName")}/></label>
+      <label>First Name<input className={f.firstName.trim()!==was.firstName?"td-changed":""} value={f.firstName} onChange={set("firstName")}/></label>
+      <label>Middle Name<input className={f.middleName.trim()!==was.middleName?"td-changed":""} value={f.middleName} onChange={set("middleName")}/></label>
+      <label>Suffix<input className={f.suffix.trim()!==was.suffix?"td-changed":""} value={f.suffix} onChange={set("suffix")} placeholder="Jr., III"/></label>
+      <label>Birth Date<input type="date" className={f.birthdate!==was.birthdate?"td-changed":""} value={f.birthdate} onChange={set("birthdate")}/></label>
+      <label>SRN<input className={f.srn.trim()!==was.srn?"td-changed":""} value={f.srn} onChange={set("srn")} inputMode="numeric" placeholder="10 digits"/></label>
+      {changed.length>0&&<div className="td-chg full"><p>Changing {changed.map(([,l])=>l).join(", ")}. {printed.length?`${printed.length} printed certificate${printed.length===1?"":"s"} (${printed.join(", ")}) keep${printed.length===1?"s":""} the old name until Releasing corrects and reprints ${printed.length===1?"it":"them"}. `:""}Receipts and TARs already issued keep the old name.</p>
+        <label>Reason for Change (Required)<textarea maxLength={300} value={f.identityReason} onChange={set("identityReason")} placeholder="e.g. Typo in last name; checked against the passport"/></label></div>}
+      <p className="td-group full">Contact and Work</p>
       <label>Mobile Number<input value={f.mobile} onChange={set("mobile")} inputMode="tel"/></label>
       <label>Email<input className="lc" type="email" value={f.email} onChange={set("email")}/></label>
       <label className="full">Complete Address<input value={f.address} onChange={set("address")}/></label>
       <label>Place of Birth<input value={f.placeOfBirth} onChange={set("placeOfBirth")}/></label>
-      <label>Suffix<input value={f.suffix} onChange={set("suffix")} placeholder="Jr., III"/></label>
       <label>Rank<input value={f.rank} onChange={set("rank")}/></label>
       <label>Company / Manning Agency<input value={f.company} onChange={set("company")}/></label>
       <label>Emergency Contact Person<input value={f.emergencyContactName} onChange={set("emergencyContactName")}/></label>
       <label>Emergency Contact Number<input value={f.emergencyContactMobile} onChange={set("emergencyContactMobile")} inputMode="tel"/></label>
       <label className="full">Meta Thread Link<input value={f.facebookUrl} onChange={set("facebookUrl")} inputMode="url" placeholder="https://business.facebook.com/latest/inbox/…"/></label>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onDone}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={()=>void save()}>{busy?"Saving…":"Save Changes"}</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onDone}>Cancel</button><button type="button" className="portal-primary" disabled={busy||!reasonOk} onClick={()=>void save()}>{busy?"Saving…":"Save Changes"}</button></div>
     </div>
   </section>;
 }

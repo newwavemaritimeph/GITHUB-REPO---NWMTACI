@@ -240,3 +240,9 @@
 .gp-add { display: grid; gap: var(--sp-2); }
 .gp-addrow { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--r-control); background: var(--c-surface); color: var(--c-text); font: inherit; text-align: left; cursor: pointer; }
 .gp-addrow:hover { border-color: var(--c-border-strong); background: var(--c-bg); }
+
+/* Edit Details: name, birth date and SRN with a reason (owner, 13 Nov 2026). */
+.td-group { margin: var(--sp-1) 0 0; font-size: var(--fs-th); font-weight: 700; color: var(--c-secondary); }
+.portal-form input.td-changed { border-color: var(--c-primary); background: var(--c-warning-bg); }
+.td-chg { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid #F7C9AF; border-radius: var(--r-control); background: var(--c-warning-bg); }
+.td-chg p { margin: 0; color: var(--c-warning); font-size: var(--fs-meta); }
