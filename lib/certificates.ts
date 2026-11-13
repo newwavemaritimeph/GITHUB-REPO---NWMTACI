@@ -25,6 +25,8 @@ export type CertificateContext = {
   view: CertificateView;
   issuanceEnabled: boolean;
   balanceCentavos: number;
+  /** A ₱0 fee with nothing paid (no course is free): blocks print, release and the soft copy. */
+  noFee?: boolean;
   /** The portal evaluation (20 Oct 2026): required for New Wave courses; `on` is the day it came in. */
   evaluation: { required: boolean; on: string | null };
   /** The course post-test (20 Oct 2026): required once approved; passed when any attempt passed. */
@@ -113,9 +115,12 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   const evaluationRequired = evaluationRequiredFor(c?.delivery_type ?? "In-House", (e as { partner_offer_id?: string | null }).partner_offer_id);
   // Company Charge (29 Oct 2026): billed to the partner, so the certificate does not wait for payment. None before migration 063.
   const billed = await db.from("enrollments").select("company_charge_agency_id").eq("id", e.id).maybeSingle();
-  if (!billed.error && (billed.data as { company_charge_agency_id?: string | null } | null)?.company_charge_agency_id) paid = Math.max(paid, due);
+  const companyBilled = !billed.error && !!(billed.data as { company_charge_agency_id?: string | null } | null)?.company_charge_agency_id;
+  if (companyBilled) paid = Math.max(paid, due);
+  // No course is free (owner, 13 Nov 2026): a ₱0 fee with nothing paid blocks print, release and the soft copy.
+  const noFee = !companyBilled && due <= 0 && paid <= 0;
   const view = certificateState({
-    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), paidCentavos: paid, evaluationRequired,
+    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), noFee, paidCentavos: paid, evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,
     cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null,
     photoOnFile: photo === undefined ? undefined : !!photo,
@@ -125,7 +130,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null, firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, lastName: t?.legal_last_name ?? "" },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), evaluation: { required: evaluationRequired, on: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at) }, postTest, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), noFee, evaluation: { required: evaluationRequired, on: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at) }, postTest, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 
@@ -312,7 +317,7 @@ export function softCopyProblem(ctx: CertificateContext) {
   if (!ctx.trainee.email) return "The trainee has no email on record.";
   if (!ctx.issuanceEnabled) return "Certificate printing is turned off.";
   if (ctx.view.state !== "Printed" && ctx.view.state !== "Released") return "Only a printed certificate can be sent.";
-  return releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
+  return releaseProblem({ balanceCentavos: ctx.balanceCentavos, noFee: ctx.noFee, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
 }
 
 type SoftCopyResult = { state: "Queued"; jobId: string | null; to: string } | { state: "Skipped"; why: string } | { state: "Already sent" } | { state: "Failed"; error: string };

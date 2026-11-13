@@ -18,3 +18,17 @@ describe("a ₱0 enrollment is No Fee Set, never Paid (13 Nov 2026)", () => {
     expect(route).toContain('action: "enrollment.repriced"');
   });
 });
+
+import { certificateState, noPaymentYet, releaseProblem, softCopyLine } from "@/lib/certificate-rules";
+describe("no course is free: a ₱0 fee blocks the certificate (13 Nov 2026)", () => {
+  const facts = { enrollmentStatus: "Enrolled", trainingEnd: "2026-11-01", balanceCentavos: 0, paidCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: null, cert: null };
+  it("waits for payment instead of printing", () => {
+    expect(noPaymentYet({ ...facts, noFee: true })).toBe(true);
+    expect(certificateState({ ...facts, noFee: true }, "2026-11-13").state).toBe("Waiting for payment");
+    expect(certificateState(facts, "2026-11-13").state).toBe("Due");
+  });
+  it("cannot be released or sent as a soft copy", () => {
+    expect(releaseProblem({ balanceCentavos: 0, noFee: true, evaluationRequired: false, evaluationOn: null })).toMatch(/No fee is set/);
+    expect(softCopyLine({ email: "a@b.c", balanceCentavos: 0, noFee: true, evaluationRequired: false, evaluationOn: null }).canSend).toBe(false);
+  });
+});

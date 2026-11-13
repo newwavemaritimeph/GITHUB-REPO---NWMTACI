@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { downloadCsv } from "@/lib/csv";
 import type { PortalData, Enrollment } from "../portal-live-app";
-import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
+import { addDays, first, manilaToday, dueCentavos, noFeeSet, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
 import { CERTIFICATE_STAGES, canSetSeries, certificateStage, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, softCopyLine, type CertificateStage, type CertificateView } from "@/lib/certificate-rules";
 import { ALL_DATES, Badge, Message, Modal, PeriodBar, ViewIcon, fmtDate, submit, useNeedSince, usePaged, usePeriod, usePost } from "./shared-ui";
@@ -31,7 +31,7 @@ type Photo = { enrollment_id: string; file_name: string; background_white: boole
 type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; feedbackLinks?: Record<string, string>; certificatePhotos?: Photo[] | null; postTestResults?: Record<string, PostTestResult> };
 type PostTestResult = { required: boolean; passed: boolean; best: { score: number; total: number; percent: number } | null; attempts: number };
 
-export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; evalLink: string | null; postTest: PostTestResult | null; balance: number; photo: Photo | null; fileName: string };
+export type CertificateLine = { e: Enrollment; noFee?: boolean; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; evalLink: string | null; postTest: PostTestResult | null; balance: number; photo: Photo | null; fileName: string };
 
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : null);
 const short = (d: string | null) => (d ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`)) : "—");
@@ -62,14 +62,16 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
     const evalNeeded = evaluationRequiredFor(c.delivery_type, e.partner_offer_id);
     const fb = d.feedbackAt?.[e.id] ?? null;
     const balance = data.companyCharge?.[e.id] ? 0 : Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
-    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, paidCentavos: Number(e.paid_centavos), evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
+    // No course is free (owner, 13 Nov 2026): a ₱0 fee is not paid.
+    const noFee = !data.companyCharge?.[e.id] && noFeeSet(e);
+    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, noFee, paidCentavos: Number(e.paid_centavos), evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
     if (view.state === "Cancelled") continue;
     // Not paid: off every Releasing Officer list until the Cashier records a payment (owner, 5 Nov 2026).
     if (view.state === "Waiting for payment" && !view.printCount) continue;
     if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;
     const t = first(e.trainees);
     const fileName = photoFileName({ lastName: t?.legal_last_name ?? "TRAINEE", firstName: t?.legal_first_name ?? "", middleName: (t as { legal_middle_name?: string | null } | null)?.legal_middle_name, courseCode: c.code, batchNumber: b?.batch_number ?? null, date: ended ?? today });
-    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, evalLink: d.feedbackLinks?.[e.id] ?? null, postTest: d.postTestResults?.[e.id] ?? null, balance });
+    lines.push({ e, noFee, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, evalLink: d.feedbackLinks?.[e.id] ?? null, postTest: d.postTestResults?.[e.id] ?? null, balance });
   }
   const rank = (l: CertificateLine) => (l.view.overdue ? 0 : l.view.state === "Due" ? 1 : l.view.state === "Waiting for photo" ? 2 : l.view.state === "Void requested" ? 2 : l.view.state === "Waiting for payment" || l.view.state === "Waiting for evaluation" ? 3 : 4);
   return lines.sort((a, b) => rank(a) - rank(b) || (a.ended ?? "").localeCompare(b.ended ?? ""));
@@ -140,7 +142,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
   const needs = (l: CertificateLine) => [l.view.state === "Training not finished" && `In Training · Ends ${short(l.ended)}`, l.postTest?.required && !l.postTest.passed && "Post-Test", l.evalNeeded && !l.evalDone && "Evaluation", tracked && !l.photo && "Photo"].filter(Boolean) as string[];
   const printedAt = (l: CertificateLine) => (l.cert as { printed_at?: string | null } | null)?.printed_at;
   const printedOn = (l: CertificateLine) => short(day(printedAt(l)));
-  const softOf = (l: CertificateLine) => softCopyLine({ email: (first(l.e.trainees) as { email?: string | null } | null)?.email, sentAt: l.cert?.soft_copy_sent_at, printedAt: printedAt(l), job: data.softCopyEmails?.[l.e.id], balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
+  const softOf = (l: CertificateLine) => softCopyLine({ email: (first(l.e.trainees) as { email?: string | null } | null)?.email, sentAt: l.cert?.soft_copy_sent_at, printedAt: printedAt(l), job: data.softCopyEmails?.[l.e.id], balanceCentavos: l.balance, noFee: l.noFee, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
   const sendSoft = (l: CertificateLine) => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined);
   const softLine = (l: CertificateLine) => { if (l.view.state === "Void requested") return null; const s = softOf(l); return <span className={`st-soft ${s.tone}`} title={s.title}>{s.text}{s.on && ` · ${short(day(s.on))}`}{s.failed && <button type="button" className="st-b" disabled={busy} onClick={() => sendSoft(l)}>Resend</button>}</span>; };
   const more = (l: CertificateLine) => <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
@@ -322,7 +324,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
 
 /** Release needs the fee paid and the evaluation in (owner, 20 Oct 2026); the server checks again. */
 function ReleaseButton({ l, onRelease, primary }: { l: CertificateLine; onRelease: () => void; primary?: boolean }) {
-  const why = releaseProblem({ balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
+  const why = releaseProblem({ balanceCentavos: l.balance, noFee: l.noFee, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
   return <button type="button" className={primary ? "st-b p" : undefined} disabled={!!why} title={why ?? undefined} onClick={onRelease}>{why ? `Release · ${why.replace(/:.*$/, "")}` : "Release"}</button>;
 }
 

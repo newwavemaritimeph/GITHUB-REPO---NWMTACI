@@ -3173,7 +3173,7 @@ export async function POST(request: Request) {
       if (cert.status !== "Printed") return NextResponse.json({ error: "Print the certificate before releasing it." }, { status: 400 });
       // Released only when paid and evaluated (owner, 20 Oct 2026), checked again here.
       const ctx = await certificateContext(admin, input.enrollmentId);
-      const problem = ctx && releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
+      const problem = ctx && releaseProblem({ balanceCentavos: ctx.balanceCentavos, noFee: ctx.noFee, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       await admin.from("certificates").update({ release_method: input.releaseMethod ?? null, claimant_name: input.recipientName, claimant_relationship: input.claimantRelationship ?? null, id_checked: Boolean(input.idChecked), authorization_checked: Boolean(input.authorizationChecked) }).eq("id", cert.id);
       const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Released" });

@@ -20,6 +20,8 @@ export type CertificateFacts = {
   /** Last training day (YYYY-MM-DD), or null when not scheduled. */
   trainingEnd: string | null;
   balanceCentavos: number;
+  /** No course is free (owner, 13 Nov 2026): a ₱0 fee with nothing paid is a missing price, not a paid course. */
+  noFee?: boolean;
   /** Valid payments so far. */
   paidCentavos: number;
   evaluationRequired: boolean;
@@ -37,8 +39,9 @@ export type CertificateView = { state: CertificateState; dueOn: string | null; o
 
 const later = (...days: (string | null)[]) => days.filter((d): d is string => !!d).sort().at(-1) ?? null;
 
-/** Something is owed and nothing was paid. A Company Charge or a free course owes nothing here, so it passes. */
-export const noPaymentYet = (f: { balanceCentavos: number; paidCentavos: number }) => f.balanceCentavos > 0 && f.paidCentavos <= 0;
+/** Something is owed and nothing was paid. A Company Charge owes nothing here, so it passes; a ₱0 fee (no fee set) does not (owner, 13 Nov 2026: no course is free). */
+export const noPaymentYet = (f: { balanceCentavos: number; paidCentavos: number; noFee?: boolean }) => f.paidCentavos <= 0 && (f.balanceCentavos > 0 || !!f.noFee);
+export const NO_FEE_PROBLEM = "No fee is set for this course. The Cashier applies the fee and records the payment first.";
 
 export function certificateState(f: CertificateFacts, today: string): CertificateView {
   const printCount = f.cert?.printCount ?? 0;
@@ -65,8 +68,9 @@ export function certificateState(f: CertificateFacts, today: string): Certificat
 export const evaluationRequiredFor = (deliveryType: string | null | undefined, partnerOfferId: string | null | undefined) => deliveryType === "In-House" && !partnerOfferId;
 
 /** Why a printed certificate cannot be released yet (owner, 20 Oct 2026: paid and evaluated), or null. */
-export function releaseProblem(f: { balanceCentavos: number; evaluationRequired: boolean; evaluationOn: string | null; revoked?: boolean; postTestRequired?: boolean; postTestPassed?: boolean }) {
+export function releaseProblem(f: { balanceCentavos: number; noFee?: boolean; evaluationRequired: boolean; evaluationOn: string | null; revoked?: boolean; postTestRequired?: boolean; postTestPassed?: boolean }) {
   if (f.revoked) return "This certificate is revoked.";
+  if (f.noFee) return NO_FEE_PROBLEM;
   if (f.balanceCentavos > 0) return "Not paid: the training fee still has a balance.";
   // Course post-test (owner, 20 Oct 2026): live once the Admin approves the course's questions.
   if (f.postTestRequired && !f.postTestPassed) return "Post-test not passed yet.";
@@ -82,8 +86,8 @@ const STUCK_MS = 15 * 60_000;
  * The one line on a printed certificate's row (owner, 6 Nov 2026; design/soft-copy-sample.html). `canSend` is what the
  * ▾ menu's Resend Soft Copy follows, with the same waits as Release; the server checks again (softCopyProblem).
  */
-export function softCopyLine(f: { email?: string | null; sentAt?: string | null; printedAt?: string | null; job?: SoftCopyJob | null; balanceCentavos: number; evaluationRequired: boolean; evaluationOn: string | null; postTestRequired?: boolean; postTestPassed?: boolean; now?: number }): SoftCopyStatus {
-  const waiting = f.balanceCentavos > 0 ? "Sends When Balance Is Paid" : f.postTestRequired && !f.postTestPassed ? "Sends When Post-Test Is Passed" : f.evaluationRequired && !f.evaluationOn ? "Sends When Evaluation Is In" : null;
+export function softCopyLine(f: { email?: string | null; sentAt?: string | null; printedAt?: string | null; job?: SoftCopyJob | null; balanceCentavos: number; noFee?: boolean; evaluationRequired: boolean; evaluationOn: string | null; postTestRequired?: boolean; postTestPassed?: boolean; now?: number }): SoftCopyStatus {
+  const waiting = f.noFee ? "Sends When the Fee Is Set and Paid" : f.balanceCentavos > 0 ? "Sends When Balance Is Paid" : f.postTestRequired && !f.postTestPassed ? "Sends When Post-Test Is Passed" : f.evaluationRequired && !f.evaluationOn ? "Sends When Evaluation Is In" : null;
   const canSend = !!f.email && !waiting;
   const sent = (on: string): SoftCopyStatus => ({ tone: "sent", text: "Soft Copy Sent", on, canSend, failed: false });
   // An email from before the latest print says nothing about this print.
