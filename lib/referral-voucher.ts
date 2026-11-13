@@ -3,12 +3,30 @@
  * Freelance) endorsed in a period, with the date enrolled, course and rebate, and the total. Issued once and
  * kept as a snapshot (202610290088).
  */
-export type ReferralVoucherRow = { enrolledOn: string; trainee: string; courseCode: string; course: string; rebateCentavos: number; rebateId?: string };
+export type ReferralVoucherRow = { enrolledOn: string; trainee: string; courseCode: string; course: string; rebateCentavos: number; rebateId?: string } & Partial<LineFacts>;
+/** Detailed lines (owner, 13 Nov 2026): the enrollment, its fee, what was paid, the last receipt and when. */
+export type LineFacts = { enrollmentNo: string; feeCentavos: number; paidCentavos: number; receipt: string | null; paidOn: string | null };
+export const paidInFull = (r: Partial<LineFacts>) => r.feeCentavos != null && r.paidCentavos != null && r.feeCentavos > 0 && r.paidCentavos >= r.feeCentavos;
+
+/** What Accounting checks before approving: who is not paid in full, who is on another voucher, the payee, and the total. */
+export function voucherChecks(v: { rows: ReferralVoucherRow[]; totalCentavos: number; mode?: string; payeeAccount?: string | null; reference?: string | null }, onOtherVoucher: Set<string> = new Set()) {
+  const unpaid = v.rows.filter((r) => r.feeCentavos != null && !paidInFull(r));
+  const twice = v.rows.filter((r) => r.rebateId && onOtherVoucher.has(r.rebateId));
+  const needsPayee = !!v.mode && v.mode !== "Offset at Payment" && v.mode !== "Cash";
+  return [
+    { ok: !unpaid.length, text: unpaid.length ? `Not paid in full: ${unpaid.map((r) => r.trainee).join(", ")}` : "Every trainee is paid in full" },
+    { ok: !twice.length, text: twice.length ? `Also on another voucher: ${twice.map((r) => r.trainee).join(", ")}` : "No trainee is on another voucher" },
+    { ok: !needsPayee || !!(v.payeeAccount || v.reference), text: needsPayee ? (v.payeeAccount || v.reference ? `Payee: ${v.payeeAccount || v.reference}` : "No payee account") : `Paid by ${v.mode ?? "Offset at Payment"}; no account needed` },
+    { ok: voucherTotal(v.rows) === Number(v.totalCentavos), text: `Lines add up to the total (${v.rows.length} line${v.rows.length === 1 ? "" : "s"})` },
+  ];
+}
 export type ReferralVoucherSnapshot = {
   number: string; issuedOn: string; partner: string; kind: string; referralCode: string | null; contact: string | null;
   from: string; to: string; rows: ReferralVoucherRow[]; totalCentavos: number; preparedBy: string;
   /** Prepared by the Cashier (owner, 10 Nov 2026): how the partner is paid, and the details for it. */
   mode?: string; reference?: string | null; payeeAccount?: string | null;
+  /** The Cashier's note to Accounting (13 Nov 2026). */
+  note?: string | null;
 };
 export const VOUCHER_MODES = ["Offset at Payment", "Cash", "GCash", "Bank Transfer"] as const;
 export type VoucherStatus = "For Approval" | "Approved" | "Returned" | "Released";

@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { ActionsMenu, Badge, Message, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, manilaDay, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
+import { ActionsMenu, Badge, Message, Modal, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, manilaDay, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { REASONS, REJECT_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
@@ -16,6 +16,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason, askText } from "./dialogs";
+import { paidInFull, voucherChecks, type ReferralVoucherRow, type ReferralVoucherSnapshot } from "@/lib/referral-voucher";
 import { SPECIAL_URL, pendingSpecials, specialCourse, specialTrainee } from "./special-arrangements";
 import { CashierSummaryReport } from "./live-cashier";
 import type { SummaryRange } from "@/lib/summary-range";
@@ -59,6 +60,7 @@ const pendingTarReprints = (data: PortalData) => data.requests.filter((r) => r.r
 const COUNTED: Category[] = ["TAR reprints", "Cashier opening and closing"];
 /** The proof on a request (owner, 10 Nov 2026: "put an eye"): one eye per receipt photo, or the voucher PDF. */
 function ApprovalEyes({ r }: { r: Row }) {
+  if (r.open) return <span className="ap-eyes"><button type="button" className="portal-secondary row-act" onClick={r.open}>Details</button>{r.preview && <ViewIcon label={r.preview.label} href={r.preview.href} />}</span>;
   if (r.preview) return <span className="ap-eyes"><ViewIcon label={r.preview.label} href={r.preview.href} /></span>;
   if (!r.receipts) return null;
   return r.receipts.length
@@ -69,7 +71,7 @@ function ApprovalEyes({ r }: { r: Row }) {
 function ApprovalActions({ r, busy, onReject }: { r: Row; busy: boolean; onReject: () => void }) {
   return <ActionsMenu disabled={busy} items={[{ label: r.okLabel, onClick: () => void r.act(true).catch(() => undefined) }, r.canReject && { label: "Reject with Reason", onClick: onReject, danger: true }]} />;
 }
-type Row = { id: string; reasons?: string[]; title: string; detail: string; receipts?: { fileId: string; link: string }[]; preview?: { label: string; href: string }; ref: string; who: string; when: string; amount: number; noAmount?: boolean; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
+type Row = { id: string; open?: () => void; reasons?: string[]; title: string; detail: string; receipts?: { fileId: string; link: string }[]; preview?: { label: string; href: string }; ref: string; who: string; when: string; amount: number; noAmount?: boolean; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
  * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
@@ -86,6 +88,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState("");
   const [doneNote, setDoneNote] = useState("");
+  const [rvOpen, setRvOpen] = useState<string | null>(null);
   const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
   const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null; receipt_files?: { fileId: string; link: string }[] | null })[])
     .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, reasons: REJECT_REASONS.expense, receipts: (e as { is_budget?: boolean | null }).is_budget ? undefined : e.receipt_files ?? [], title: `${(e as { is_budget?: boolean | null }).is_budget ? "Budget Request · " : ""}${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
@@ -117,7 +120,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     act: (approve, remarks) => post({ action: "request-decide", id: r.id, approve, remarks }, approve ? "Approved. One more print of the TAR is allowed." : "TAR reprint rejected.") }; });
   // Referral Vouchers the Cashier sent (owner, 10 Nov 2026): preview the PDF, then approve or return.
   const partnerName = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
-  const vouchers = (data.referralVouchers ?? []).filter((v) => (v.status ?? "For Approval") === "For Approval").map((v): Row => ({ id: v.id, preview: { label: `View ${v.voucher_number}`, href: `/api/documents/referral-voucher/${v.id}` }, reasons: ["Wrong partner or period", "Wrong mode of payment", "Missing account details"], title: `${partnerName(v.agency_id)} · Referral Voucher`, detail: `${fmtDate(v.period_from)} – ${fmtDate(v.period_to)}${v.mode ? ` · ${v.mode}` : ""}`, ref: v.voucher_number, who: "Cashier", when: fmtDate(day(v.issued_at)), amount: Number(v.total_centavos), okLabel: "Approve", canReject: true,
+  const vouchers = (data.referralVouchers ?? []).filter((v) => (v.status ?? "For Approval") === "For Approval").map((v): Row => ({ id: v.id, open: () => setRvOpen(v.id), preview: { label: `View ${v.voucher_number}`, href: `/api/documents/referral-voucher/${v.id}` }, reasons: ["Wrong partner or period", "Wrong mode of payment", "Missing account details"], title: `${partnerName(v.agency_id)} · Referral Voucher`, detail: `${fmtDate(v.period_from)} – ${fmtDate(v.period_to)}${v.mode ? ` · ${v.mode}` : ""}`, ref: v.voucher_number, who: "Cashier", when: fmtDate(day(v.issued_at)), amount: Number(v.total_centavos), okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "referral-voucher-decide", id: v.id, approve, remarks: remarks ?? "" }, approve ? "Approved. The Cashier can release it." : "Returned to the Cashier.") }));
   const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], "Referral vouchers": vouchers, Refunds: refunds, Discounts: discounts, "Special arrangements": specials, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
@@ -130,10 +133,11 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     {rejecting === r.id && <RejectInline reasons={r.reasons ?? REJECT_REASONS.request} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
   </div>);
   const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
+  const rvModal = rvOpen && <ReferralVoucherDetail id={rvOpen} role="accounting" busy={busy} post={post} onClose={() => setRvOpen(null)} />;
   if (rail) {
     const order = CATEGORY_GROUPS.flatMap(([, cs]) => cs);
     const current: Category = cat === "All" ? order.find((k) => lists[k].length) ?? "Expense requests" : cat;
-    return <div className="ad-split">
+    return <>{rvModal}<div className="ad-split">
       <section className="portal-panel cx-panel ad-rail"><div className="panel-heading"><h2>To Do</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
         {CATEGORY_GROUPS.map(([g, cs], i) => <div key={g} className="ad-grp"><span className="ad-grp-h">{i + 1} · {tcl(g)}</span>
           {cs.map((k) => <button key={k} type="button" className={current === k ? "on" : ""} onClick={() => { setCat(k); setRejecting(null); }}><span>{tcl(k)}<small>{COUNTED.includes(k) ? `${lists[k].length} to ${k === "TAR reprints" ? "decide" : "review"}` : pesos2(lists[k].reduce((x, r) => x + r.amount, 0))}</small></span><b className={lists[k].length ? "" : "zero"}>{lists[k].length}</b></button>)}
@@ -147,16 +151,16 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
           {rail.bottom}
         </section>
       </div>
-    </div>;
+    </div></>;
   }
   if (compact) {
     const current = cat === "All" ? "Expense requests" : cat;
-    return <section className="portal-panel cx-panel ac-approvals">
+    return <>{rvModal}<section className="portal-panel cx-panel ac-approvals">
       <div className="panel-heading"><h2>For Your Approval</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
       {msg && <Message kind={msg.kind} text={msg.text} />}
       <div className="ac-tabs" role="tablist">{(Object.keys(lists) as Category[]).map((k) => <button key={k} type="button" role="tab" aria-selected={current === k} className={current === k ? "on" : ""} onClick={() => setCat(k)}>{tcl(k)}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>
       {lists[current].length ? rowsOf(lists[current].slice(0, 6)) : <p className="portal-empty-copy">Nothing waiting.</p>}
-    </section>;
+    </section></>;
   }
   // Checklist with bulk approve: only categories with requests get a group; empty ones are listed in one line.
   const cats = Object.keys(lists) as Category[];
@@ -176,7 +180,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     setBulk(""); setPicked(new Set());
     setDoneNote(done === chosen.length ? `${done} approved.` : `${done} of ${chosen.length} approved; the next one could not be completed.`);
   }
-  return <div className="ac-check">
+  return <div className="ac-check">{rvModal}
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="chips ac-chipbar">
       <button type="button" className={`ac-chip${cat === "All" ? " on" : ""}`} onClick={() => setCat("All")}>All<span className={waiting ? "has" : ""}>{waiting}</span></button>
@@ -452,20 +456,25 @@ export function ReferralVoucherPanel({ data, busy, post, onClose, role }: { data
   const today = manilaToday();
   const partners = data.agencies.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name));
   const [agencyId, setAgencyId] = useState(partners[0]?.id ?? ""), [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
-  const [mode, setMode] = useState<string>("Offset at Payment"), [reference, setReference] = useState(""), [payeeAccount, setPayeeAccount] = useState("");
+  const [mode, setMode] = useState<string>("Offset at Payment"), [reference, setReference] = useState(""), [payeeAccount, setPayeeAccount] = useState(""), [note, setNote] = useState("");
   const [issued, setIssued] = useState<{ id: string; number: string } | null>(null);
+  // Detailed lines (owner, 13 Nov 2026): the Cashier sees every trainee before sending; not paid in full starts unticked.
+  const [lines, setLines] = useState<ReferralVoucherRow[] | null>(null), [pick, setPick] = useState<Set<string>>(new Set()), [loading, setLoading] = useState(false), [lineErr, setLineErr] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
   const nameOf = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
   const needsAccount = mode !== "Offset at Payment" && mode !== "Cash";
+  const changed = <T,>(set: (v: T) => void) => (v: T) => { set(v); setLines(null); setLineErr(""); };
+  async function loadLines() {
+    setLoading(true); setLineErr(""); setIssued(null);
+    try { const r = await submit({ action: "referral-voucher-preview", agencyId, from, to }) as { rows: ReferralVoucherRow[] }; setLines(r.rows); setPick(new Set(r.rows.filter((x) => x.rebateId && paidInFull(x)).map((x) => x.rebateId as string))); }
+    catch (e) { setLines(null); setLineErr(e instanceof Error ? e.message : "Could not load the lines."); } finally { setLoading(false); }
+  }
+  const chosen = (lines ?? []).filter((r) => r.rebateId && pick.has(r.rebateId));
   async function generate() {
     setIssued(null);
-    try { const r = await post({ action: "referral-voucher-issue", agencyId, from, to, mode, reference: reference.trim(), payeeAccount: payeeAccount.trim() }, "Referral Voucher sent to Accounting for approval."); if (r?.id) setIssued({ id: String(r.id), number: String(r.number) }); }
+    try { const r = await post({ action: "referral-voucher-issue", agencyId, from, to, mode, reference: reference.trim(), payeeAccount: payeeAccount.trim(), note: note.trim(), rebateIds: chosen.map((x) => x.rebateId) }, "Referral Voucher sent to Accounting for approval."); if (r?.id) { setIssued({ id: String(r.id), number: String(r.number) }); setLines(null); setNote(""); } }
     catch { /* the page shows the error */ }
   }
-  const decide = async (id: string, approve: boolean) => {
-    const remarks = approve ? "" : await askReason("Return this Referral Voucher to the Cashier?", ["Wrong partner or period", "Wrong mode of payment", "Missing account details", "Other"], { title: "Return Voucher", okLabel: "Return", danger: true });
-    if (!approve && !remarks) return;
-    await post({ action: "referral-voucher-decide", id, approve, remarks: remarks ?? "" }, approve ? "Approved. The Cashier can release it." : "Returned to the Cashier.").catch(() => undefined);
-  };
   const release = async (id: string, vMode?: string | null) => {
     const ref = vMode && vMode !== "Offset at Payment" && vMode !== "Cash" ? await askReason(`Release by ${vMode}: enter the transaction reference.`, [], { title: "Release Voucher", okLabel: "Release" }) : "";
     if (ref === null) return;
@@ -475,20 +484,92 @@ export function ReferralVoucherPanel({ data, busy, post, onClose, role }: { data
   return <section className="portal-panel cx-panel rv-panel">
     <div className="panel-heading"><h2>Referral Vouchers</h2>{onClose && <button type="button" className="portal-secondary row-act" onClick={onClose}>Close</button>}</div>
     <div className="rv-form">
-      <label>Partner<select value={agencyId} onChange={(e) => setAgencyId(e.target.value)}>{partners.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.kind === "Consultancy" || a.kind === "Freelance" ? a.kind : "Agency"}</option>)}</select></label>
-      <label>From<input type="date" value={from} max={today} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
-      <label>To<input type="date" value={to} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>
+      <label>Partner<select value={agencyId} onChange={(e) => changed(setAgencyId)(e.target.value)}>{partners.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.kind === "Consultancy" || a.kind === "Freelance" ? a.kind : "Agency"}</option>)}</select></label>
+      <label>From<input type="date" value={from} max={today} onChange={(e) => e.target.value && changed(setFrom)(e.target.value)} /></label>
+      <label>To<input type="date" value={to} max={today} onChange={(e) => e.target.value && changed(setTo)(e.target.value)} /></label>
       <label>Mode of Payment<select value={mode} onChange={(e) => setMode(e.target.value)}>{["Offset at Payment", "Cash", "GCash", "Bank Transfer"].map((m) => <option key={m}>{m}</option>)}</select></label>
       {needsAccount && <label>Payee Account<input value={payeeAccount} maxLength={160} onChange={(e) => setPayeeAccount(e.target.value)} placeholder="Account name and number" /></label>}
       {needsAccount && <label>Reference / Details<input value={reference} maxLength={80} onChange={(e) => setReference(e.target.value)} placeholder="Optional" /></label>}
-      <button type="button" className="portal-primary row-act" disabled={busy || !agencyId || to < from || (needsAccount && !payeeAccount.trim() && !reference.trim())} onClick={() => void generate()}>{busy ? "Sending…" : "Submit to Accounting"}</button>
+      <button type="button" className="portal-secondary row-act" disabled={loading || !agencyId || to < from} onClick={() => void loadLines()}>{loading ? "Loading…" : lines ? "Reload Lines" : "Show Lines"}</button>
     </div>
+    {lineErr && <Message kind="error" text={lineErr} />}
+    {lines && <div className="rv-lines">
+      <VoucherLines rows={lines} pick={pick} onTick={(id, on) => setPick((cur) => { const n = new Set(cur); if (on) n.add(id); else n.delete(id); return n; })} />
+      <p className="portal-form-note">Unticked lines stay owed and can go on a later voucher. Trainees not paid in full start unticked.</p>
+      <div className="rv-send"><label>Note to Accounting<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. 1 trainee held: balance not yet paid" /></label>
+        <button type="button" className="portal-primary" disabled={busy || !chosen.length || (needsAccount && !payeeAccount.trim() && !reference.trim())} onClick={() => void generate()}>{busy ? "Sending…" : `Send to Accounting · ${pesos2(chosen.reduce((t, r) => t + r.rebateCentavos, 0))}`}</button></div>
+    </div>}
     {issued && <p className="rv-done"><a className="portal-secondary row-act" href={`/api/documents/referral-voucher/${issued.id}`} target="_blank" rel="noreferrer">Preview {issued.number}</a></p>}
     {list.length > 0 && <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Partner</th><th>Mode</th><th>Status</th><th className="r">Total</th><th></th></tr></thead><tbody>
       {list.map((v) => { const st = v.status ?? "For Approval"; return <tr key={v.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{v.voucher_number}</span><small>{fmtDate(manilaDay(v.issued_at))}</small></td><td data-l="Partner">{nameOf(v.agency_id)}<small>{fmtDate(v.period_from)} – {fmtDate(v.period_to)}</small></td><td data-l="Mode">{v.mode ?? "—"}</td><td data-l="Status"><Badge tone={RV_TONE[st]}>{st}</Badge>{st === "Returned" && v.remarks ? <small>{v.remarks}</small> : null}</td><td data-l="Total" className="r"><strong className="cx-amt">{pesos2(Number(v.total_centavos))}</strong></td>
-        <td data-l=""><div className="cx-acts"><ViewIcon label={`Preview ${v.voucher_number}`} href={`/api/documents/referral-voucher/${v.id}`} /><ActionsMenu disabled={busy} items={[role === "accounting" && st === "For Approval" && { label: "Approve", onClick: () => void decide(v.id, true) }, role === "accounting" && st === "For Approval" && { label: "Return with Reason", danger: true, onClick: () => void decide(v.id, false) }, role === "cashier" && st === "Approved" && { label: "Release", onClick: () => void release(v.id, v.mode) }]} /></div></td></tr>; })}
+        <td data-l=""><div className="cx-acts"><ViewIcon label={`Preview ${v.voucher_number}`} href={`/api/documents/referral-voucher/${v.id}`} /><ActionsMenu disabled={busy} items={[{ label: role === "accounting" && st === "For Approval" ? "Review" : "View Details", onClick: () => setOpen(v.id) }, role === "cashier" && st === "Approved" && { label: "Release", onClick: () => void release(v.id, v.mode) }]} /></div></td></tr>; })}
     </tbody></table></div>}
+    {open && <ReferralVoucherDetail id={open} role={role} busy={busy} post={post} onClose={() => setOpen(null)} />}
   </section>;
+}
+
+/** The trainee lines of a voucher: enrollment, course, fee, paid, last receipt, payment state and rebate; ticks when preparing. */
+function VoucherLines({ rows, pick, onTick }: { rows: ReferralVoucherRow[]; pick?: Set<string>; onTick?: (id: string, on: boolean) => void }) {
+  const on = (r: ReferralVoucherRow) => !pick || (!!r.rebateId && pick.has(r.rebateId));
+  const inc = rows.filter(on);
+  const sum = (f: (r: ReferralVoucherRow) => number) => inc.reduce((t, r) => t + f(r), 0);
+  const unpaid = inc.filter((r) => r.feeCentavos != null && !paidInFull(r)).length;
+  const byCourse = Object.entries(inc.reduce<Record<string, number>>((m, r) => ({ ...m, [r.courseCode || "—"]: (m[r.courseCode || "—"] ?? 0) + 1 }), {})).map(([c, n]) => `${c} ${n}`).join(" · ");
+  return <>
+    <div className="hr-kpis rv-kpis">
+      <div className="hr-kpi"><b>{inc.length}</b><small>Trainees</small></div>
+      <div className="hr-kpi"><b>{pesos2(sum((r) => r.rebateCentavos))}</b><small>Total Rebate</small></div>
+      <div className="hr-kpi"><b>{pesos2(sum((r) => r.feeCentavos ?? 0))}</b><small>Course Fees</small></div>
+      <div className="hr-kpi"><b>{pesos2(sum((r) => r.paidCentavos ?? 0))}</b><small>Collected</small></div>
+      <div className={`hr-kpi${unpaid ? " rv-warn" : ""}`}><b>{unpaid}</b><small>Not Paid in Full</small></div>
+    </div>
+    <div className="portal-table-wrap"><table className="portal-table cx-cards rv-table"><thead><tr>{onTick && <th aria-label="Include" />}<th>#</th><th>Enrolled</th><th>Trainee</th><th>Course</th><th className="num">Course Fee</th><th className="num">Paid</th><th>Receipt</th><th>Payment</th><th className="num">Rebate</th></tr></thead><tbody>
+      {rows.map((r, i) => { const full = paidInFull(r), owed = (r.feeCentavos ?? 0) - (r.paidCentavos ?? 0); return <tr key={r.rebateId ?? i} className={on(r) ? "" : "rv-off"}>
+        {onTick && <td data-l=""><input type="checkbox" className="cx-tickbox" checked={on(r)} disabled={!r.rebateId} aria-label={`Include ${r.trainee}`} onChange={(e) => r.rebateId && onTick(r.rebateId, e.target.checked)} /></td>}
+        <td data-l="#">{i + 1}</td><td data-l="Enrolled">{fmtDate(r.enrolledOn)}</td>
+        <td data-l="Trainee" className="lead"><strong>{r.trainee}</strong><small>{r.enrollmentNo ?? ""}</small></td>
+        <td data-l="Course">{r.courseCode}<small>{r.course}</small></td>
+        <td data-l="Course Fee" className="num">{r.feeCentavos != null ? pesos2(r.feeCentavos) : "—"}</td>
+        <td data-l="Paid" className="num">{r.paidCentavos != null ? pesos2(r.paidCentavos) : "—"}</td>
+        <td data-l="Receipt">{r.receipt ?? "—"}<small>{r.paidOn ? fmtDate(r.paidOn) : ""}</small></td>
+        <td data-l="Payment">{r.feeCentavos == null ? <small>Not recorded</small> : full ? <Badge tone="green">Paid in Full</Badge> : (r.paidCentavos ?? 0) > 0 ? <Badge tone="orange">{`Balance ${pesos2(owed)}`}</Badge> : <Badge tone="red">Not Paid</Badge>}</td>
+        <td data-l="Rebate" className="num"><b>{pesos2(r.rebateCentavos)}</b></td></tr>; })}
+      {!rows.length && <tr><td colSpan={onTick ? 10 : 9} className="hr-none">No rebates owed to this partner in these dates.</td></tr>}
+    </tbody><tfoot><tr>{onTick && <td />}<td colSpan={4}>Total · {inc.length} trainee{inc.length === 1 ? "" : "s"}{byCourse ? ` · ${byCourse}` : ""}</td><td className="num">{pesos2(sum((r) => r.feeCentavos ?? 0))}</td><td className="num">{pesos2(sum((r) => r.paidCentavos ?? 0))}</td><td colSpan={2} /><td className="num"><b>{pesos2(sum((r) => r.rebateCentavos))}</b></td></tr></tfoot></table></div>
+  </>;
+}
+
+type VoucherDetail = { voucher: { id: string; number: string; totalCentavos: number; issuedAt: string; snapshot: ReferralVoucherSnapshot }; events: { status: string; remarks: string | null; reference: string | null; by: string | null; at: string }[]; status: string; onOtherVoucher: string[] };
+/** The full voucher (owner, 13 Nov 2026): lines with live payment facts, the checks, the partner and payment, and its history. */
+export function ReferralVoucherDetail({ id, role, busy, post, onClose }: { id: string; role: "cashier" | "accounting"; busy: boolean; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown> | undefined>; onClose: () => void }) {
+  const [d, setD] = useState<VoucherDetail | null>(null), [err, setErr] = useState("");
+  useEffect(() => { let live = true; submit({ action: "referral-voucher-detail", id }).then((r) => { if (live) setD(r as VoucherDetail); }).catch((e) => { if (live) setErr(e instanceof Error ? e.message : "Could not load the voucher."); }); return () => { live = false; }; }, [id]);
+  const snap = d?.voucher.snapshot;
+  const checks = snap ? voucherChecks({ ...snap, totalCentavos: d.voucher.totalCentavos }, new Set(d.onOtherVoucher)) : [];
+  async function decide(approve: boolean) {
+    const remarks = approve ? "" : await askReason("Return this Referral Voucher to the Cashier?", ["A trainee is not paid in full", "Wrong partner or period", "Wrong mode of payment", "Missing account details", "Rebate amount does not match"], { title: "Return Voucher", okLabel: "Return", danger: true });
+    if (!approve && !remarks) return;
+    try { await post({ action: "referral-voucher-decide", id, approve, remarks: remarks ?? "" }, approve ? `${d?.voucher.number} approved. The Cashier can release it.` : `${d?.voucher.number} returned to the Cashier.`); onClose(); } catch { /* the page shows the error */ }
+  }
+  return <Modal title={d ? `${d.voucher.number} · ${snap?.partner ?? ""}` : "Referral Voucher"} eyebrow="Referral Voucher" onClose={onClose} size="lg" wide>
+    {err && <Message kind="error" text={err} />}
+    {!d && !err && <p className="portal-empty-copy">Loading…</p>}
+    {d && snap && <div className="rv-detail">
+      <div className="rv-detail-main">
+        <VoucherLines rows={snap.rows} />
+      </div>
+      <aside className="rv-detail-side">
+        <section><h3>Status</h3><Badge tone={RV_TONE[d.status] ?? "orange"}>{d.status}</Badge></section>
+        <section><h3>Checks</h3><ul className="rv-checks">{checks.map((c) => <li key={c.text} className={c.ok ? "ok" : "no"}><i aria-hidden="true">{c.ok ? "✓" : "!"}</i><span>{c.text}</span></li>)}</ul></section>
+        <section><h3>Partner and Payment</h3><dl className="rv-facts">
+          <dt>Partner</dt><dd>{snap.partner}</dd><dt>Type</dt><dd>{snap.kind}</dd><dt>Code</dt><dd>{snap.referralCode ?? "—"}</dd><dt>Contact</dt><dd>{snap.contact ?? "—"}</dd>
+          <dt>Period</dt><dd>{fmtDate(snap.from)} – {fmtDate(snap.to)}</dd><dt>Mode</dt><dd>{snap.mode ?? "Offset at Payment"}</dd><dt>Payee</dt><dd>{snap.payeeAccount || snap.reference || "—"}</dd><dt>Note</dt><dd>{snap.note || "—"}</dd><dt>Prepared By</dt><dd>{snap.preparedBy}</dd></dl></section>
+        <section><h3>History</h3><ul className="rv-history">{d.events.map((e, i) => <li key={i}><b>{e.status === "For Approval" ? "Sent to Accounting" : e.status}</b><small>{[e.by, `${fmtDate(manilaDay(e.at))} ${fmtClock(e.at)}`, e.remarks, e.reference ? `Ref ${e.reference}` : ""].filter(Boolean).join(" · ")}</small></li>)}</ul></section>
+      </aside>
+    </div>}
+    <div className="portal-form-actions rv-detail-acts"><a className="portal-secondary" href={`/api/documents/referral-voucher/${id}`} target="_blank" rel="noreferrer">View PDF</a><button type="button" className="portal-secondary" onClick={onClose}>Close</button>
+      {role === "accounting" && d?.status === "For Approval" && <><button type="button" className="portal-secondary danger" disabled={busy} onClick={() => void decide(false)}>Return</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void decide(true)}>{`Approve ${pesos2(d.voucher.totalCentavos)}`}</button></>}</div>
+  </Modal>;
 }
 
 /** Payables: bills and fees New Wave owes, plus rebates owed to no-deduction partners. Mark paid records the settlement. */

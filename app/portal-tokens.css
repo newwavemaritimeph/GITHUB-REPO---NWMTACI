@@ -246,3 +246,26 @@
 .portal-form input.td-changed { border-color: var(--c-primary); background: var(--c-warning-bg); }
 .td-chg { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid #F7C9AF; border-radius: var(--r-control); background: var(--c-warning-bg); }
 .td-chg p { margin: 0; color: var(--c-warning); font-size: var(--fs-meta); }
+
+/* Referral Voucher, detailed (owner, 13 Nov 2026): lines before sending; the full review for Accounting. */
+.rv-lines { display: grid; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--c-border); }
+.rv-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.rv-kpis .rv-warn b { color: var(--c-warning); }
+.rv-table tr.rv-off td { opacity: .5; }
+.rv-table tfoot td { font-weight: 700; background: var(--c-bg); }
+.rv-send { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: flex-end; justify-content: space-between; }
+.rv-send label { flex: 1 1 320px; display: grid; gap: var(--sp-1); }
+.rv-detail { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--sp-4); align-items: start; }
+.rv-detail-main { display: grid; gap: var(--sp-3); min-width: 0; }
+.rv-detail-side { display: grid; gap: var(--sp-3); }
+.rv-detail-side section { border: 1px solid var(--c-border); border-radius: var(--r-card); padding: var(--sp-3); display: grid; gap: var(--sp-2); background: var(--c-surface); }
+.rv-detail-side h3 { margin: 0; font-size: var(--fs-section); color: var(--c-text); }
+.rv-checks, .rv-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); font-size: var(--fs-meta); }
+.rv-checks li { display: flex; gap: var(--sp-2); align-items: flex-start; }
+.rv-checks i { font-style: normal; font-weight: 700; width: 16px; flex: none; }
+.rv-checks .ok i { color: #0A7A3E; } .rv-checks .no i { color: var(--c-warning); } .rv-checks .no span { color: var(--c-warning); }
+.rv-history small { display: block; color: var(--c-muted); }
+.rv-facts { display: grid; grid-template-columns: auto 1fr; gap: var(--sp-1) var(--sp-3); margin: 0; font-size: var(--fs-meta); }
+.rv-facts dt { color: var(--c-muted); } .rv-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.rv-detail-acts { margin-top: var(--sp-4); }
+@media (max-width: 900px) { .rv-detail { grid-template-columns: minmax(0, 1fr); } .rv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
